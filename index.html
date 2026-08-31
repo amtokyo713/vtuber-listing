@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d0f14">
 <title>VTuber資産ポータル</title>
 <link rel="manifest" href="manifest.webmanifest">
 <style>
@@ -34,15 +35,22 @@ button{font:inherit; color:inherit; cursor:pointer}
 #gate .box{width:min(400px,100%); text-align:center}
 #gate h1{font-size:20px; margin:0 0 6px; letter-spacing:.04em}
 #gate p{color:var(--fg2); font-size:13px; margin:0 0 22px}
+#gate .pwwrap{position:relative}
+/* 左右対称の padding にして、目アイコンを足しても入力文字の中央寄せが崩れないようにする */
 #gate input{
-  width:100%; padding:13px 15px; border-radius:10px; border:1px solid var(--line);
+  width:100%; padding:13px 46px; border-radius:10px; border:1px solid var(--line);
   background:var(--bg2); color:var(--fg); font-size:16px; text-align:center; letter-spacing:.2em;
 }
 #gate input:focus{outline:none; border-color:var(--accent)}
-#gate button{
+#gate .eye{
+  position:absolute; right:3px; top:50%; transform:translateY(-50%);
+  background:none; border:0; padding:12px 13px; font-size:16px; line-height:1; color:var(--fg2);
+}
+#gate button[type="submit"]{
   width:100%; margin-top:12px; padding:13px; border:0; border-radius:10px;
   background:var(--accent); color:#fff; font-weight:700;
 }
+#gate button[type="submit"]:disabled{opacity:.6; cursor:default}
 #gate .msg{margin-top:14px; font-size:13px; min-height:20px; color:var(--warn)}
 
 /* ---------- ヘッダ・タブ ---------- */
@@ -55,6 +63,12 @@ header{
 .brand{font-size:16px; font-weight:800; letter-spacing:.03em}
 .brand span{color:var(--accent)}
 .built{font-size:11px; color:var(--fg3); margin-left:auto}
+.navwrap{position:relative}
+/* 幅の狭い端末ではタブが見切れる。続きがあることを右端のフェードで示す。 */
+.navwrap::after{
+  content:""; position:absolute; right:0; top:0; bottom:8px; width:26px; pointer-events:none;
+  background:linear-gradient(90deg, rgba(13,15,20,0), rgba(13,15,20,.94));
+}
 nav{display:flex; gap:4px; padding:0 10px 8px; overflow-x:auto; -webkit-overflow-scrolling:touch}
 nav button{
   flex:0 0 auto; padding:8px 14px; border:1px solid transparent; border-radius:999px;
@@ -66,15 +80,42 @@ nav button .n{color:var(--fg3); font-size:11px; margin-left:5px}
 main{padding:16px 16px 60px; max-width:1180px; margin:0 auto}
 section[hidden]{display:none}
 
+/* ---------- ホーム帯（着地して最初に読む場所） ---------- */
+.home{
+  background:var(--bg2); border:1px solid var(--line); border-radius:var(--radius);
+  padding:12px 14px; margin-bottom:14px; display:grid; gap:9px;
+}
+.home-top{font-size:13px; color:var(--fg2); display:flex; align-items:baseline; gap:8px; flex-wrap:wrap}
+.home-top b{color:var(--fg); font-size:16px; font-weight:800; margin-right:1px}
+.home-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12.5px}
+/* 稼働中サイトは横1行に流す。縦に積むとホーム帯だけで画面の1/3を使ってしまう。 */
+.home-row.links{flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px}
+.home-row.links .hlink{flex:0 0 auto}
+.hlabel{color:var(--fg3); font-size:11.5px; flex:0 0 auto}
+.hchip{
+  padding:7px 13px; border-radius:999px; border:1px solid var(--accent);
+  background:rgba(124,92,255,.14); color:var(--fg); font-size:12.5px; font-weight:700;
+}
+.hchip.hnew{border-color:var(--ok); background:rgba(74,222,128,.13)}
+.hchip.ghost{border-color:var(--line); background:var(--bg3); color:var(--fg3); font-weight:400}
+.hlink{
+  padding:6px 11px; border-radius:8px; background:var(--bg3); border:1px solid var(--line);
+  color:var(--accent2); font-size:12.5px;
+}
+.hlink:hover{text-decoration:none; border-color:var(--accent2)}
+.hauto{color:var(--fg2)}
+.hnote{color:var(--fg3); font-size:11px}
+
 /* ---------- 絞り込み ---------- */
 .filters{display:flex; flex-direction:column; gap:10px; margin-bottom:14px}
 .search{position:relative}
+/* 16px 未満だと iOS が入力フォーカスで画面を自動ズームするため下げない */
 .search input{
   width:100%; padding:12px 40px 12px 14px; border-radius:10px; border:1px solid var(--line);
-  background:var(--bg2); color:var(--fg); font-size:15px;
+  background:var(--bg2); color:var(--fg); font-size:16px;
 }
 .search input:focus{outline:none; border-color:var(--accent)}
-.search .clear{position:absolute; right:6px; top:50%; transform:translateY(-50%); border:0; background:none; color:var(--fg3); padding:8px}
+.search .clear{position:absolute; right:4px; top:50%; transform:translateY(-50%); border:0; background:none; color:var(--fg3); padding:11px 12px}
 .chips{display:flex; gap:6px; flex-wrap:wrap}
 .chip{
   padding:6px 12px; border-radius:999px; border:1px solid var(--line);
@@ -82,13 +123,27 @@ section[hidden]{display:none}
 }
 .chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
 .chip .n{opacity:.6; margin-left:5px; font-size:11px}
+.catmore{
+  align-self:flex-start; padding:7px 12px; border-radius:8px; border:1px dashed var(--line);
+  background:none; color:var(--fg3); font-size:12px;
+}
 .meta-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--fg3); font-size:12px}
 .meta-row select{
   background:var(--bg2); color:var(--fg2); border:1px solid var(--line);
   border-radius:8px; padding:6px 10px; font-size:12.5px;
 }
 .fulltoggle{display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none}
-.fulltoggle input{accent-color:var(--accent); width:15px; height:15px}
+.fulltoggle input{accent-color:var(--accent); width:16px; height:16px}
+.quick{display:flex; gap:5px}
+.qchip{
+  padding:5px 10px; border-radius:999px; border:1px solid var(--line);
+  background:var(--bg2); color:var(--fg2); font-size:12px;
+}
+.qchip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.reset{
+  margin-left:6px; padding:4px 9px; border-radius:999px; border:1px solid var(--line);
+  background:var(--bg3); color:var(--fg2); font-size:11.5px;
+}
 
 /* ---------- 読み込み中 ---------- */
 #loading{position:fixed; inset:0; display:grid; place-items:center; background:var(--bg); z-index:90}
@@ -103,25 +158,43 @@ section[hidden]{display:none}
   background:var(--bg2); border:1px solid var(--line); border-radius:var(--radius);
   padding:14px 15px; text-align:left; width:100%; display:flex; flex-direction:column; gap:7px;
   transition:border-color .15s, transform .15s;
-  /* 画面外のカードは描画を省く（277 枚あるため。無いとスクロールと描画が重い） */
+  /* 画面外のカードは描画を省く（279 枚あるため。無いとスクロールと描画が重い） */
   content-visibility:auto; contain-intrinsic-size:auto 186px;
 }
 .card:hover{border-color:var(--accent); transform:translateY(-1px)}
 .card.locked{opacity:.62}
 .card.locked:hover{border-color:var(--line); transform:none; cursor:default}
-.card .top{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--fg3)}
+.card .top{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--fg3); flex-wrap:wrap}
 .card .cat{color:var(--accent2)}
 .card h3{margin:0; font-size:14.5px; line-height:1.5; font-weight:700}
 .card .sum{margin:0; font-size:12.5px; color:var(--fg2); line-height:1.65;
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
-.card .foot{display:flex; gap:8px; align-items:center; font-size:11px; color:var(--fg3); margin-top:auto; padding-top:4px}
+.card .foot{display:flex; gap:8px; align-items:center; font-size:11px; color:var(--fg3); margin-top:auto; padding-top:4px; flex-wrap:wrap}
 .tag{padding:2px 7px; border-radius:5px; background:var(--bg3); font-size:10.5px; color:var(--fg2)}
 .tag.lock{background:#3a2230; color:var(--danger)}
 .tag.idx{background:#33301f; color:var(--warn)}
-.empty{text-align:center; color:var(--fg3); padding:50px 20px; font-size:14px}
+.tag.new{background:#123324; color:var(--ok); font-weight:700}
+.empty{text-align:center; color:var(--fg3); padding:44px 20px 50px; font-size:14px}
+.empty .cond{font-size:12px; color:var(--fg2); margin:10px 0 0}
+.empty .acts{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:18px}
+.empty .acts button{
+  padding:10px 15px; border-radius:9px; border:1px solid var(--line);
+  background:var(--bg2); color:var(--fg); font-size:13px;
+}
+.empty .acts button.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700}
 
 /* ---------- ツール・自動化 ---------- */
 .grid2{display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+/* 稼働中サイトは詳細をプロジェクト一覧側に任せ、ここは「開く」だけの1行にする
+   （同じカードを2度並べると 22 件のはずが 25 枚に見える） */
+.livebar{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px}
+.liverow{
+  display:flex; align-items:center; gap:9px; padding:10px 14px; border-radius:999px;
+  background:var(--bg2); border:1px solid var(--line); color:var(--fg); font-size:13px;
+}
+.liverow:hover{text-decoration:none; border-color:var(--ok)}
+.liverow .dot{width:8px; height:8px; border-radius:50%; background:var(--ok); flex:0 0 auto}
+.liverow .go{color:var(--fg3); font-size:11.5px}
 .panel{background:var(--bg2); border:1px solid var(--line); border-radius:var(--radius); padding:15px 16px}
 .panel h3{margin:0 0 4px; font-size:15px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
 .panel .kind{font-size:11px; color:var(--fg3); font-weight:400}
@@ -136,7 +209,7 @@ section[hidden]{display:none}
 .b-unknown{background:#33301f; color:var(--warn)} .b-temporary{background:#2a2440; color:#b39dff}
 .b-retired{background:#2e2024; color:var(--danger)}
 .path{font-family:ui-monospace,"Consolas",monospace; font-size:11px; color:var(--fg3); word-break:break-all}
-.golink{display:inline-block; margin-top:10px; padding:7px 13px; border-radius:8px;
+.golink{display:inline-block; margin-top:10px; padding:8px 14px; border-radius:8px;
   background:var(--accent); color:#fff; font-size:12.5px; font-weight:700}
 .golink:hover{text-decoration:none; filter:brightness(1.12)}
 
@@ -153,10 +226,14 @@ h2.sec:first-child{margin-top:0}
 .tl-m h3 span{font-size:11.5px; color:var(--fg3); font-weight:400; margin-left:8px}
 .tl-list{display:grid; gap:5px}
 .tl-item{background:var(--bg2); border:1px solid var(--line); border-radius:8px;
-  padding:8px 12px; font-size:12.5px; text-align:left; width:100%; display:flex; gap:9px; align-items:baseline}
+  padding:9px 12px; font-size:12.5px; text-align:left; width:100%; display:flex; gap:9px; align-items:baseline}
 .tl-item:hover{border-color:var(--accent)}
+/* 本文が無い項目は押しても何も起きない。見た目で分かるようにする */
+.tl-item:disabled{opacity:.5; cursor:default}
+.tl-item:disabled:hover{border-color:var(--line)}
 .tl-item .d{color:var(--fg3); font-size:11px; flex:0 0 auto; font-variant-numeric:tabular-nums}
 .tl-item .t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.tl-item .nb{flex:0 0 auto; font-size:10.5px; color:var(--warn)}
 
 /* ---------- リーダー ---------- */
 #reader{position:fixed; inset:0; z-index:60; background:var(--bg); display:flex; flex-direction:column}
@@ -165,9 +242,11 @@ h2.sec:first-child{margin-top:0}
   padding-top:calc(10px + env(safe-area-inset-top));
   border-bottom:1px solid var(--line); background:var(--bg2); flex:0 0 auto;
 }
-#reader .rhead button{background:var(--bg3); border:1px solid var(--line); border-radius:8px; padding:8px 13px; font-size:13px}
-#reader .rhead .rt{flex:1; min-width:0; font-size:13.5px; font-weight:700;
+#reader .rhead button{background:var(--bg3); border:1px solid var(--line); border-radius:8px; padding:10px 14px; font-size:13px}
+#reader .rhead .rt{flex:1; min-width:0; font-size:13.5px; font-weight:700; cursor:pointer;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+/* タップで全文表示（1行省略だと日付つきの長いタイトルが判別できない） */
+#reader .rhead .rt.open{white-space:normal; overflow:visible; text-overflow:clip}
 #reader .rbody{flex:1; overflow:auto; -webkit-overflow-scrolling:touch}
 #reader .rinner{max-width:860px; margin:0 auto; padding:22px 18px 80px}
 #reader iframe{width:100%; height:100%; border:0; background:#fff}
@@ -186,10 +265,11 @@ h2.sec:first-child{margin-top:0}
   border-left:3px solid var(--fg3); border-radius:0 8px 8px 0; color:var(--fg2); font-size:14px}
 .doc blockquote p:last-child{margin-bottom:0}
 .doc code{background:var(--bg3); padding:2px 6px; border-radius:5px;
-  font-family:ui-monospace,"Consolas",monospace; font-size:.87em; color:var(--accent2)}
+  font-family:ui-monospace,"Consolas",monospace; font-size:.87em; color:var(--accent2);
+  overflow-wrap:anywhere}
 .doc pre{background:var(--bg2); border:1px solid var(--line); border-radius:8px;
   padding:13px; overflow-x:auto; margin:0 0 16px}
-.doc pre code{background:none; padding:0; color:var(--fg2)}
+.doc pre code{background:none; padding:0; color:var(--fg2); overflow-wrap:normal}
 .doc table{border-collapse:collapse; width:100%; font-size:13px; margin:0 0 16px}
 .doc .tablewrap{overflow-x:auto; margin:0 0 16px}
 .doc .tablewrap table{margin:0}
@@ -207,6 +287,21 @@ h2.sec:first-child{margin-top:0}
   .grid2{grid-template-columns:1fr}
   #reader .rinner{padding:18px 14px 70px}
   .doc h1{font-size:19px} .doc h2{font-size:16.5px}
+  /* select も 16px 未満は iOS のフォーカスズーム対象 */
+  .meta-row select{font-size:16px; padding:7px 10px}
+  /* カテゴリチップは 11 個あり、縦積みにすると最初の文書まで 2 画面スクロールになる。
+     既定は 2 行だけ見せて、続きはボタンで開く。 */
+  .chips.collapsed{max-height:76px; overflow:hidden}
+  .home{padding:10px 12px; gap:7px; margin-bottom:12px}
+  nav button{padding:11px 15px}
+  .chip{padding:8px 13px}
+  .tl-item{padding:11px 12px}
+  /* スマホでは Windows のファイルパスを使う場面が無い */
+  #rcopy{display:none}
+}
+@media(min-width:601px){
+  .navwrap::after{display:none}
+  .catmore{display:none}
 }
 </style>
 </head>
@@ -217,13 +312,19 @@ h2.sec:first-child{margin-top:0}
 </div>
 
 <div id="gate" hidden>
-  <div class="box">
+  <form class="box" id="gateform" autocomplete="on">
     <h1>VTuber<span style="color:var(--accent)">資産ポータル</span></h1>
     <p>社内限定。閲覧パスワードを入力してください。</p>
-    <input id="pw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="パスワード">
-    <button id="unlock">解錠</button>
+    <div class="pwwrap">
+      <!-- inputmode は指定しない。numeric にすると iOS で数字キーパッドが出て英字を打てなくなる。 -->
+      <input id="pw" name="password" type="password" autocomplete="current-password"
+             enterkeyhint="go" spellcheck="false" autocapitalize="off" autocorrect="off"
+             placeholder="パスワード">
+      <button type="button" class="eye" id="pwtoggle" aria-label="パスワードを表示">👁</button>
+    </div>
+    <button type="submit" id="unlock">解錠</button>
     <div class="msg" id="gatemsg"></div>
-  </div>
+  </form>
 </div>
 
 <div id="app" hidden>
@@ -232,51 +333,63 @@ h2.sec:first-child{margin-top:0}
       <div class="brand">VTuber<span>資産ポータル</span></div>
       <div class="built" id="built"></div>
     </div>
-    <nav id="tabs">
-      <button data-v="docs" aria-selected="true">📊 書庫<span class="n" id="n-docs"></span></button>
-      <button data-v="tools" aria-selected="false">🛠 ツール・サイト<span class="n" id="n-tools"></span></button>
-      <button data-v="auto" aria-selected="false">🤖 自動化<span class="n" id="n-auto"></span></button>
-      <button data-v="timeline" aria-selected="false">📜 年表</button>
-    </nav>
+    <div class="navwrap">
+      <nav id="tabs" role="tablist">
+        <button role="tab" data-v="docs" aria-selected="true">📊 書庫<span class="n" id="n-docs"></span></button>
+        <button role="tab" data-v="tools" aria-selected="false">🛠 ツール・サイト<span class="n" id="n-tools"></span></button>
+        <button role="tab" data-v="auto" aria-selected="false">🤖 自動化<span class="n" id="n-auto"></span></button>
+        <button role="tab" data-v="timeline" aria-selected="false">📜 年表<span class="n" id="n-tl"></span></button>
+      </nav>
+    </div>
   </header>
 
   <main>
-    <section id="view-docs">
+    <section id="view-docs" role="tabpanel">
+      <div class="home" id="home" hidden></div>
       <div class="filters">
         <div class="search">
-          <input id="q" type="search" placeholder="タイトル・要約・本文を検索（例: ステララボ／準備中／いいね営業）">
+          <input id="q" type="search" enterkeyhint="search"
+                 placeholder="タイトル・要約を検索（☑ で本文も）">
           <button class="clear" id="qclear" hidden>✕</button>
         </div>
         <div class="chips" id="cats"></div>
+        <button class="catmore" id="catmore" hidden>すべてのカテゴリを表示 ▾</button>
         <div class="meta-row">
           <span id="count"></span>
-          <label class="fulltoggle"><input type="checkbox" id="full"> 本文も検索</label>
+          <span class="quick" id="quick">
+            <button class="qchip" data-d="7" aria-pressed="false">7日</button>
+            <button class="qchip" data-d="30" aria-pressed="false">30日</button>
+            <button class="qchip" data-d="90" aria-pressed="false">90日</button>
+          </span>
           <select id="sort">
             <option value="date-desc">新しい順</option>
             <option value="date-asc">古い順</option>
+            <option value="mtime-desc">更新が新しい順</option>
             <option value="title">タイトル順</option>
             <option value="size">分量が多い順</option>
           </select>
           <select id="year"><option value="">すべての時期</option></select>
+          <label class="fulltoggle"><input type="checkbox" id="full"> 本文も検索</label>
+          <label class="fulltoggle"><input type="checkbox" id="readable"> 読める文書のみ</label>
         </div>
       </div>
       <div class="cards" id="doclist"></div>
     </section>
 
-    <section id="view-tools" hidden>
+    <section id="view-tools" hidden role="tabpanel">
       <h2 class="sec">🟢 いま動いているサイト</h2>
-      <div class="grid2" id="livesites"></div>
+      <div class="livebar" id="livesites"></div>
       <h2 class="sec">📦 プロジェクト一覧</h2>
       <div class="chips" id="pstatus" style="margin-bottom:12px"></div>
       <div class="grid2" id="projlist"></div>
     </section>
 
-    <section id="view-auto" hidden>
+    <section id="view-auto" hidden role="tabpanel">
       <h2 class="sec">🤖 定期実行されている処理</h2>
       <div class="grid2" id="autolist"></div>
     </section>
 
-    <section id="view-timeline" hidden>
+    <section id="view-timeline" hidden role="tabpanel">
       <div class="tl" id="tl"></div>
     </section>
   </main>
@@ -285,7 +398,7 @@ h2.sec:first-child{margin-top:0}
 <div id="reader" hidden>
   <div class="rhead">
     <button id="rback">← 戻る</button>
-    <div class="rt" id="rtitle"></div>
+    <div class="rt" id="rtitle" title="タップで全文表示"></div>
     <button id="rcopy" title="ファイルパスをコピー">パスをコピー</button>
   </div>
   <div class="rbody" id="rbody"></div>
@@ -304,7 +417,10 @@ async function deriveKey(pw, salt, iter){
     base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
 }
 async function gunzip(buf){
-  if (typeof DecompressionStream === "undefined") throw new Error("この端末は gzip 展開に対応していません");
+  // パスワード誤りと端末非対応は原因が違う。catch 側で見分けられるよう印を付ける。
+  if (typeof DecompressionStream === "undefined"){
+    const e = new Error("この端末は gzip 展開に対応していません"); e.code = "NOGZIP"; throw e;
+  }
   const ds = new DecompressionStream("gzip");
   const stream = new Blob([buf]).stream().pipeThrough(ds);
   return new Uint8Array(await new Response(stream).arrayBuffer());
@@ -362,8 +478,10 @@ async function boot(){
   document.getElementById("loading").hidden = true;
   gate.hidden = false;
   const pwEl = document.getElementById("pw"), msg = document.getElementById("gatemsg");
+  const btn = document.getElementById("unlock");
   const tryUnlock = async (pw) => {
-    if(!pw) return;
+    if(!pw || btn.disabled) return;
+    btn.disabled = true;                       // PBKDF2 の1秒間に連打すると鍵導出が多重に走る
     msg.textContent = "解錠中…（初回は数秒かかります）";
     try{
       const key = await deriveKey(pw, b64d(raw.salt), raw.iterations);
@@ -371,12 +489,24 @@ async function boot(){
       await _idbPut(_keyId(raw), key);   // 保存するのは鍵だけ。パスワードは残さない
       gate.hidden = true; render();
     }catch(e){
-      msg.textContent = "パスワードが違います";
+      msg.textContent = e && e.code === "NOGZIP"
+        ? "この端末は表示に必要な機能（gzip 展開）に未対応です。別のブラウザでお試しください"
+        : "パスワードが違います";
+    }finally{
+      btn.disabled = false;
     }
   };
   msg.textContent = "";
-  document.getElementById("unlock").onclick = () => tryUnlock(pwEl.value.trim());
-  pwEl.onkeydown = e => { if(e.key === "Enter") tryUnlock(pwEl.value.trim()); };
+  // form の submit に集約すると、キーボードの「go」でもボタンでも同じ経路になる
+  document.getElementById("gateform").onsubmit = e => { e.preventDefault(); tryUnlock(pwEl.value.trim()); };
+  document.getElementById("pwtoggle").onclick = () => {
+    const show = pwEl.type === "password";
+    pwEl.type = show ? "text" : "password";
+    const t = document.getElementById("pwtoggle");
+    t.textContent = show ? "🙈" : "👁";
+    t.setAttribute("aria-label", show ? "パスワードを隠す" : "パスワードを表示");
+    pwEl.focus();
+  };
   pwEl.focus();
 }
 
@@ -385,8 +515,11 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 /** 設定ファイルの注記は Markdown で書かれているので **強調** だけ活かす（エスケープ後に変換）。 */
 const escB = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-let state = {view:"docs", q:"", cat:"", year:"", sort:"date-desc", pstatus:"", full:false};
+let state = {view:"docs", q:"", cat:"", year:"", days:0, sort:"date-desc", pstatus:"",
+             full:false, readable:false, newOnly:false};
 let fullIndexed = false;
+let NEW_IDS = new Set();          // 前回訪問以降に増えた文書
+const LS_SEEN = "vp:seen";
 
 /** 本文の全文検索索引（重いので必要になった時に1度だけ作る）。 */
 function buildFullIndex(){
@@ -395,6 +528,40 @@ function buildFullIndex(){
     d._hay = d._head + " " + (d.body ? d.body.replace(/<[^>]+>/g, " ").toLowerCase() : "");
   });
   fullIndexed = true;
+}
+
+/** N 日前の日付（YYYY-MM-DD）。docs の date と文字列比較する。 */
+function cutoff(days){
+  const d = new Date(); d.setDate(d.getDate() - days);
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth()+1) + "-" + p(d.getDate());
+}
+
+/** 前回訪問との差分を出す。週次で勝手に増える設計なので「何が増えたか」を出せないと気づけない。
+    generated_at が変わるまでは計算済みの差分を保つ（リロードで NEW が消えないように）。 */
+function computeNew(){
+  const cur = DATA.docs.map(d => d.id);
+  let seen = null;
+  try{ seen = JSON.parse(localStorage.getItem(LS_SEEN) || "null"); }catch(e){}
+  const save = o => { try{ localStorage.setItem(LS_SEEN, JSON.stringify(o)); }catch(e){} };
+  if(!seen || !Array.isArray(seen.ids)){
+    save({gen: DATA.generated_at, ids: cur, newIds: []});   // 初回は基準を作るだけ
+    return;
+  }
+  if(seen.gen === DATA.generated_at){
+    NEW_IDS = new Set(seen.newIds || []);
+    return;
+  }
+  const known = new Set(seen.ids);
+  const diff = cur.filter(id => !known.has(id));
+  NEW_IDS = new Set(diff);
+  save({gen: DATA.generated_at, ids: cur, newIds: diff});
+}
+function markAllSeen(){
+  NEW_IDS = new Set();
+  try{ localStorage.setItem(LS_SEEN, JSON.stringify({gen: DATA.generated_at, ids: DATA.docs.map(d => d.id), newIds: []})); }catch(e){}
+  if(state.newOnly) state.newOnly = false;
+  buildHome(); renderDocs();
 }
 
 function render(){
@@ -408,8 +575,58 @@ function render(){
   $("n-docs").textContent = DATA.docs.length;
   $("n-tools").textContent = DATA.projects.length;
   $("n-auto").textContent = DATA.automation.length;
-  buildCatChips(); buildYears(); renderDocs();
+  $("n-tl").textContent = DATA.docs.length;
+  computeNew();
+  buildHome(); buildCatChips(); buildYears(); renderDocs();
   wire();
+}
+
+/* ---------- ホーム帯 ---------- */
+function buildHome(){
+  const recent = DATA.docs.filter(d => d.date >= cutoff(7)).length;
+  const live = DATA.projects.filter(p => p.status === "live" && p.url);
+  const ac = {};
+  DATA.automation.forEach(a => ac[a.status] = (ac[a.status]||0)+1);
+  const aTxt = Object.keys(ac).map(s => (SLABEL[s]||s) + " " + ac[s]).join(" ・ ");
+  const n = NEW_IDS.size;
+  const h = $("home");
+  h.hidden = false;
+  h.innerHTML =
+    `<div class="home-top"><b>${DATA.docs.length}</b> 文書 ・ <b>${DATA.projects.length}</b> ツール ・ <b>${DATA.automation.length}</b> 自動化</div>` +
+    `<div class="home-row">` +
+      (recent ? `<button class="hchip" data-act="recent">🆕 直近7日に ${recent} 件</button>` : "") +
+      (n ? `<button class="hchip hnew" data-act="new">前回から +${n} 件</button>
+            <button class="hchip ghost" data-act="seen">既読にする</button>` : "") +
+      (!recent && !n ? `<span class="hnote">直近7日の追加はありません</span>` : "") +
+    `</div>` +
+    (live.length ? `<div class="home-row links"><span class="hlabel">🟢 稼働中</span>` +
+      live.map(p => `<a class="hlink" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)} ↗</a>`).join("") +
+      `</div>` : "") +
+    // 「稼働中」は設定ファイルに書かれた状態であって死活監視の結果ではない。誤読されると
+    // 止まっている自動化を動いていると誤認するので、その但し書きは必ず添える。
+    (aTxt ? `<div class="home-row"><span class="hlabel">🤖 自動化</span><span class="hauto">${esc(aTxt)}</span>
+       <span class="hnote" title="設定ファイル上の状態です。実際に動いているかの監視結果ではありません">※設定値</span></div>` : "");
+  h.onclick = e => {
+    const b = e.target.closest("button[data-act]"); if(!b) return;
+    const act = b.dataset.act;
+    if(act === "seen"){ markAllSeen(); return; }
+    if(act === "recent"){ setQuick(7); return; }
+    if(act === "new"){
+      state.newOnly = !state.newOnly;
+      state.days = 0; state.year = ""; $("year").value = ""; syncQuick();
+      renderDocs();
+    }
+  };
+}
+
+function setQuick(days){
+  state.days = (state.days === days) ? 0 : days;
+  state.newOnly = false;
+  state.year = ""; $("year").value = "";
+  syncQuick(); renderDocs();
+}
+function syncQuick(){
+  [...$("quick").children].forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.d) === state.days)));
 }
 
 function wire(){
@@ -417,30 +634,55 @@ function wire(){
   // 描画・スクショが詰まる（2026-08-31 の実機検証で判明）。
   const built = {};
   const builders = {tools:buildTools, auto:buildAuto, timeline:buildTimeline};
+  const scrollPos = {};
   $("tabs").onclick = e => {
     const b = e.target.closest("button[data-v]"); if(!b) return;
+    scrollPos[state.view] = window.scrollY;      // タブを往復しても読んでいた位置に戻れるように
     state.view = b.dataset.v;
     if(builders[state.view] && !built[state.view]){ builders[state.view](); built[state.view] = true; }
     [...$("tabs").children].forEach(x => x.setAttribute("aria-selected", String(x === b)));
     ["docs","tools","auto","timeline"].forEach(v => $("view-"+v).hidden = (v !== state.view));
-    window.scrollTo(0,0);
+    window.scrollTo(0, scrollPos[state.view] || 0);
   };
   const q = $("q");
-  q.oninput = () => { state.q = q.value.trim(); $("qclear").hidden = !state.q; renderDocs(); };
+  let qTimer = null;
+  q.oninput = () => {
+    state.q = q.value.trim();
+    $("qclear").hidden = !state.q;
+    clearTimeout(qTimer);
+    // 本文検索の索引作成は数百 ms 固まる。先に「検索中」を描いてから作る
+    // （チェック切替経路だけでなく打鍵経路にも必要）。
+    if(state.full && !fullIndexed && state.q){
+      $("count").textContent = "本文を検索中…";
+      qTimer = setTimeout(renderDocs, 16);
+      return;
+    }
+    qTimer = setTimeout(renderDocs, 120);        // 打鍵ごとに 279 枚を組み直さない
+  };
   $("qclear").onclick = () => { q.value=""; state.q=""; $("qclear").hidden=true; renderDocs(); q.focus(); };
   $("full").onchange = e => {
     state.full = e.target.checked;
     if(state.full && !fullIndexed && state.q){
       $("count").textContent = "本文を検索中…";
-      setTimeout(() => renderDocs(), 16);   // 索引作成の前に画面を1度描かせる
+      setTimeout(renderDocs, 16);   // 索引作成の前に画面を1度描かせる
       return;
     }
     renderDocs();
   };
+  $("readable").onchange = e => { state.readable = e.target.checked; renderDocs(); };
   $("sort").onchange = e => { state.sort = e.target.value; renderDocs(); };
-  $("year").onchange = e => { state.year = e.target.value; renderDocs(); };
-  $("rback").onclick = closeReader;
-  document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("reader").hidden) closeReader(); });
+  $("year").onchange = e => {
+    state.year = e.target.value;
+    if(state.year){ state.days = 0; state.newOnly = false; syncQuick(); }
+    renderDocs();
+  };
+  $("quick").onclick = e => {
+    const b = e.target.closest(".qchip"); if(!b) return;
+    setQuick(Number(b.dataset.d));
+  };
+  $("rback").onclick = requestCloseReader;
+  $("rtitle").onclick = () => $("rtitle").classList.toggle("open");
+  document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("reader").hidden) requestCloseReader(); });
 }
 
 function buildCatChips(){
@@ -458,6 +700,26 @@ function buildCatChips(){
     [...el.children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
     renderDocs();
   };
+  setupCatCollapse();
+}
+
+/** モバイルではチップ 11 個が 8 行を占めるので、既定 2 行 ＋「すべて表示」にする。 */
+function setupCatCollapse(){
+  const el = $("cats"), more = $("catmore");
+  const narrow = () => window.matchMedia("(max-width:600px)").matches;
+  let open = false;
+  const sync = () => {
+    if(!narrow()){ el.classList.remove("collapsed"); more.hidden = true; return; }
+    el.classList.add("collapsed");
+    const overflows = el.scrollHeight > el.clientHeight + 2;   // 2 行に収まるなら出さない
+    if(open || !overflows){ el.classList.remove("collapsed"); }
+    more.hidden = !overflows && !open;
+    more.textContent = open ? "カテゴリを閉じる ▴" : "すべてのカテゴリを表示 ▾";
+  };
+  more.onclick = () => { open = !open; sync(); };
+  let t = null;
+  window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(sync, 150); });
+  sync();
 }
 
 function buildYears(){
@@ -466,10 +728,36 @@ function buildYears(){
     months.map(m => `<option value="${m}">${m.replace("-","年")}月</option>`).join("");
 }
 
+function catLabel(id){
+  if(id === "other") return "その他";
+  const c = (DATA.categories || []).find(x => x.id === id);
+  return c ? c.label : id;
+}
+/** いま効いている絞り込み。0 件のときに「何のせいで 0 件なのか」を出すために使う。 */
+function activeConds(){
+  const c = [];
+  if(state.q) c.push(`検索「${state.q}」${state.full ? "（本文含む）" : "（タイトル・要約）"}`);
+  if(state.cat) c.push(`カテゴリ「${catLabel(state.cat)}」`);
+  if(state.days) c.push(`直近${state.days}日`);
+  if(state.year) c.push(`${state.year.replace("-","年")}月`);
+  if(state.newOnly) c.push("新着のみ");
+  if(state.readable) c.push("読める文書のみ");
+  return c;
+}
+function clearAllFilters(){
+  state.q = ""; state.cat = ""; state.year = ""; state.days = 0; state.newOnly = false; state.readable = false;
+  $("q").value = ""; $("qclear").hidden = true; $("year").value = ""; $("readable").checked = false;
+  [...$("cats").children].forEach((x,i) => x.setAttribute("aria-pressed", String(i === 0)));
+  syncQuick(); renderDocs();
+}
+
 function filtered(){
   let out = DATA.docs;
   if(state.cat) out = out.filter(d => d.category === state.cat);
   if(state.year) out = out.filter(d => d.date.startsWith(state.year));
+  if(state.days){ const c = cutoff(state.days); out = out.filter(d => d.date >= c); }
+  if(state.newOnly) out = out.filter(d => NEW_IDS.has(d.id));
+  if(state.readable) out = out.filter(d => !!d.body);
   if(state.q){
     const terms = state.q.toLowerCase().split(/\s+/).filter(Boolean);
     // 本文検索は索引を1度だけ作る。毎打鍵で 8MB を連結・小文字化すると描画が固まる
@@ -482,26 +770,45 @@ function filtered(){
   }
   const s = state.sort;
   out = [...out].sort((a,b) =>
-    s === "date-asc" ? a.date.localeCompare(b.date) :
-    s === "title"    ? a.title.localeCompare(b.title, "ja") :
-    s === "size"     ? b.bytes - a.bytes :
-                       b.date.localeCompare(a.date));
+    s === "date-asc"   ? a.date.localeCompare(b.date) :
+    s === "mtime-desc" ? String(b.mtime).localeCompare(String(a.mtime)) :
+    s === "title"      ? a.title.localeCompare(b.title, "ja") :
+    s === "size"       ? b.bytes - a.bytes :
+                         b.date.localeCompare(a.date));
   return out;
 }
 
 function renderDocs(){
   const list = filtered();
-  $("count").textContent = `${list.length} 件`;
-  if(!list.length){ $("doclist").innerHTML = `<div class="empty">該当する文書がありません。<br>検索語を減らすか、カテゴリを「すべて」に戻してください。</div>`; return; }
+  const conds = activeConds();
+  $("count").innerHTML = `${list.length} 件` +
+    (conds.length ? ` <button class="reset" id="resetall">絞り込み解除 ✕</button>` : "");
+  const rst = $("resetall"); if(rst) rst.onclick = clearAllFilters;
+
+  if(!list.length){
+    // 行き止まりにしない。いちばん効くリカバリ（本文も検索）を文言でなくボタンで出す。
+    $("doclist").innerHTML = `<div class="empty">
+      該当する文書がありません。
+      <p class="cond">適用中: ${esc(conds.join(" ／ ")) || "なし"}</p>
+      <div class="acts">
+        ${state.q && !state.full ? `<button class="primary" id="tryfull">本文も検索して再実行</button>` : ""}
+        <button id="clearall">フィルタを全解除</button>
+      </div></div>`;
+    const tf = $("tryfull");
+    if(tf) tf.onclick = () => { state.full = true; $("full").checked = true; $("count").textContent = "本文を検索中…"; setTimeout(renderDocs, 16); };
+    $("clearall").onclick = clearAllFilters;
+    return;
+  }
   $("doclist").innerHTML = list.map(d => {
     const readable = !!d.body;
     // バッジは「公開版でどう扱われるか」を示す。ローカル版では全 tier が読める。
     const local = DATA.mode === "local";
     const lock = d.tier === 3 ? `<span class="tag lock">${local ? "公開版では非掲載" : "非掲載"}</span>`
                : d.tier === 2 ? `<span class="tag idx">${local ? "公開版は索引のみ" : "索引のみ"}</span>` : "";
+    const isNew = NEW_IDS.has(d.id) ? `<span class="tag new">NEW</span>` : "";
     const att = (d.attachments||[]).map(a => `<span class="tag">${esc(a.toUpperCase())}</span>`).join("");
     return `<button class="card ${readable?"":"locked"}" data-id="${esc(d.id)}" ${readable?"":"disabled"}>
-      <div class="top"><span class="cat">${esc(d.category_label)}</span><span>·</span><span>${esc(d.date)}</span></div>
+      <div class="top"><span class="cat">${esc(d.category_label)}</span><span>·</span><span>${esc(d.date)}</span>${isNew}</div>
       <h3>${esc(d.title)}</h3>
       <p class="sum">${esc(d.summary)}</p>
       <div class="foot"><span class="tag">${esc(d.root_label)}</span>${lock}${att}
@@ -516,11 +823,12 @@ function renderDocs(){
 
 function openReader(id){
   const d = DATA.docs.find(x => x.id === id); if(!d) return;
-  $("rtitle").textContent = d.title;
+  const t = $("rtitle");
+  t.textContent = d.title; t.title = d.title; t.classList.remove("open");
   $("rcopy").onclick = () => {
     navigator.clipboard?.writeText(d.path).then(
       () => { $("rcopy").textContent = "コピーしました"; setTimeout(()=>$("rcopy").textContent="パスをコピー", 1600); },
-      () => {});
+      () => { $("rcopy").textContent = "コピーできません"; setTimeout(()=>$("rcopy").textContent="パスをコピー", 1600); });
   };
   const body = $("rbody");
   if(d.body_kind === "iframe"){
@@ -537,16 +845,22 @@ function openReader(id){
         <div><b>元ファイル</b> <span class="path">${esc(d.rel)}</span></div>
       </div>
       <div class="doc">${d.body}</div></div>`;
-    body.querySelectorAll(".doc table").forEach(t => {
-      if(t.parentElement.classList.contains("tablewrap")) return;
+    body.querySelectorAll(".doc table").forEach(t2 => {
+      if(t2.parentElement.classList.contains("tablewrap")) return;
       const w = document.createElement("div"); w.className = "tablewrap";
-      t.parentNode.insertBefore(w, t); w.appendChild(t);
+      t2.parentNode.insertBefore(w, t2); w.appendChild(t2);
     });
   }
   body.scrollTop = 0;
   $("reader").hidden = false;
   document.body.style.overflow = "hidden";
   history.pushState({reader:1}, "");
+}
+/** 閉じる操作は必ず履歴を1つ戻す。直接 closeReader すると空の履歴が溜まり、
+    以後のブラウザバック／スワイプバックが n 回空振りする。 */
+function requestCloseReader(){
+  if(history.state && history.state.reader) history.back();
+  else closeReader();
 }
 function closeReader(){
   $("reader").hidden = true;
@@ -561,7 +875,6 @@ const SLABEL = {live:"稼働中", done:"完了・現役参照", frozen:"凍結�
 function projCard(p){
   const url = p.url ? `<a class="golink" href="${esc(p.url)}" target="_blank" rel="noopener">開く ↗</a>` : "";
   const kv = [
-    p.what ? "" : "",
     p.update ? `<div><b>更新</b>${esc(p.update)}</div>` : "",
     p.auth ? `<div><b>保護</b>${esc(p.auth)}</div>` : "",
     p.repo ? `<div><b>repo</b>${esc(p.repo)}${p.repo_note ? "（"+esc(p.repo_note)+"）" : ""}</div>` : "",
@@ -578,14 +891,20 @@ function projCard(p){
     <div class="kv">${kv}</div>${note}${url}</div>`;
 }
 function buildTools(){
+  // 稼働中サイトは「開く」だけの1行に。詳細は下のプロジェクト一覧が持つので二重に並べない。
   const live = DATA.projects.filter(p => p.status === "live" && p.url);
-  $("livesites").innerHTML = live.map(projCard).join("") || `<div class="empty">公開中のサイトはありません</div>`;
+  $("livesites").innerHTML = live.map(p =>
+    `<a class="liverow" href="${esc(p.url)}" target="_blank" rel="noopener">
+       <span class="dot"></span><span>${esc(p.name)}</span><span class="go">開く ↗</span></a>`
+  ).join("") || `<div class="empty">公開中のサイトはありません</div>`;
   const counts = {};
   DATA.projects.forEach(p => counts[p.status] = (counts[p.status]||0)+1);
-  const order = ["live","done","unknown","frozen","empty"];
+  // 設定に存在する status を全部載せる（配列から漏れた status は絞り込めなくなる）
+  const order = ["live","done","unknown","temporary","frozen","empty","retired"];
+  const rest = Object.keys(counts).filter(s => !order.includes(s));
   $("pstatus").innerHTML = `<button class="chip" data-s="" aria-pressed="true">すべて<span class="n">${DATA.projects.length}</span></button>` +
-    order.filter(s => counts[s]).map(s =>
-      `<button class="chip" data-s="${s}" aria-pressed="false">${SLABEL[s]}<span class="n">${counts[s]}</span></button>`).join("");
+    [...order, ...rest].filter(s => counts[s]).map(s =>
+      `<button class="chip" data-s="${esc(s)}" aria-pressed="false">${esc(SLABEL[s]||s)}<span class="n">${counts[s]}</span></button>`).join("");
   const draw = () => {
     const sel = state.pstatus ? DATA.projects.filter(p => p.status === state.pstatus) : DATA.projects;
     $("projlist").innerHTML = sel.map(projCard).join("");
@@ -617,7 +936,8 @@ function buildTimeline(){
       <div class="tl-list">${items.map(d =>
         `<button class="tl-item" data-id="${esc(d.id)}" ${d.body?"":"disabled"}>
           <span class="d">${esc(d.date.slice(8))}日</span>
-          <span class="t">${esc(d.title)}</span></button>`).join("")}</div></div>`;
+          <span class="t">${esc(d.title)}</span>
+          ${d.body ? "" : `<span class="nb">索引のみ</span>`}</button>`).join("")}</div></div>`;
   }).join("");
   $("tl").onclick = e => {
     const b = e.target.closest(".tl-item[data-id]"); if(!b || b.disabled) return;
@@ -626,8 +946,14 @@ function buildTimeline(){
 }
 
 boot().catch(e => {
+  // standalone（ホーム画面から起動）だとリロード UI が無い。再試行手段を必ず残す。
   document.body.innerHTML = `<div class="empty" style="padding-top:80px">
-    読み込みに失敗しました<br><span class="path">${esc(e.message)}</span></div>`;
+    読み込みに失敗しました<br><span class="path">${esc(e.message)}</span>
+    <div class="acts" style="display:flex; justify-content:center; margin-top:20px">
+      <button class="primary" id="retry" style="padding:10px 18px; border-radius:9px; border:0; background:#7c5cff; color:#fff; font-weight:700">再読み込み</button>
+    </div></div>`;
+  const r = document.getElementById("retry");
+  if(r) r.onclick = () => location.reload();
 });
 </script>
 </body>
