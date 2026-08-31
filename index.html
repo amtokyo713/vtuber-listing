@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="color-scheme" content="dark">
+<title>VTuber資産ポータル</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{
+  --bg:#0d0f14; --bg2:#141821; --bg3:#1b2130; --line:#262d3d;
+  --fg:#e7ecf5; --fg2:#9aa6bd; --fg3:#68748c;
+  --accent:#7c5cff; --accent2:#00d4c7; --warn:#ffb454; --danger:#ff6b81; --ok:#4ade80;
+  --radius:12px;
+}
+*{box-sizing:border-box}
+/* id セレクタの display 指定は UA の [hidden]{display:none} を特異性で上回るため、
+   hidden 属性が効かなくなる。全要素に対して明示的に打ち消す（2026-08-31 実機検証で
+   ローカル版なのにパスワードゲートが出続けて発覚）。 */
+[hidden]{display:none !important}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,-apple-system,sans-serif;
+  font-size:15px; line-height:1.7; -webkit-text-size-adjust:100%;
+}
+a{color:var(--accent2); text-decoration:none}
+a:hover{text-decoration:underline}
+button{font:inherit; color:inherit; cursor:pointer}
+
+/* ---------- パスワードゲート ---------- */
+#gate{position:fixed; inset:0; display:grid; place-items:center; background:var(--bg); z-index:100; padding:20px}
+#gate .box{width:min(400px,100%); text-align:center}
+#gate h1{font-size:20px; margin:0 0 6px; letter-spacing:.04em}
+#gate p{color:var(--fg2); font-size:13px; margin:0 0 22px}
+#gate input{
+  width:100%; padding:13px 15px; border-radius:10px; border:1px solid var(--line);
+  background:var(--bg2); color:var(--fg); font-size:16px; text-align:center; letter-spacing:.2em;
+}
+#gate input:focus{outline:none; border-color:var(--accent)}
+#gate button{
+  width:100%; margin-top:12px; padding:13px; border:0; border-radius:10px;
+  background:var(--accent); color:#fff; font-weight:700;
+}
+#gate .msg{margin-top:14px; font-size:13px; min-height:20px; color:var(--warn)}
+
+/* ---------- ヘッダ・タブ ---------- */
+header{
+  position:sticky; top:0; z-index:30; background:rgba(13,15,20,.94);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top);
+}
+.hrow{display:flex; align-items:baseline; gap:10px; padding:12px 16px 8px; flex-wrap:wrap}
+.brand{font-size:16px; font-weight:800; letter-spacing:.03em}
+.brand span{color:var(--accent)}
+.built{font-size:11px; color:var(--fg3); margin-left:auto}
+nav{display:flex; gap:4px; padding:0 10px 8px; overflow-x:auto; -webkit-overflow-scrolling:touch}
+nav button{
+  flex:0 0 auto; padding:8px 14px; border:1px solid transparent; border-radius:999px;
+  background:transparent; color:var(--fg2); font-size:13px; white-space:nowrap;
+}
+nav button[aria-selected="true"]{background:var(--bg3); color:var(--fg); border-color:var(--line)}
+nav button .n{color:var(--fg3); font-size:11px; margin-left:5px}
+
+main{padding:16px 16px 60px; max-width:1180px; margin:0 auto}
+section[hidden]{display:none}
+
+/* ---------- 絞り込み ---------- */
+.filters{display:flex; flex-direction:column; gap:10px; margin-bottom:14px}
+.search{position:relative}
+.search input{
+  width:100%; padding:12px 40px 12px 14px; border-radius:10px; border:1px solid var(--line);
+  background:var(--bg2); color:var(--fg); font-size:15px;
+}
+.search input:focus{outline:none; border-color:var(--accent)}
+.search .clear{position:absolute; right:6px; top:50%; transform:translateY(-50%); border:0; background:none; color:var(--fg3); padding:8px}
+.chips{display:flex; gap:6px; flex-wrap:wrap}
+.chip{
+  padding:6px 12px; border-radius:999px; border:1px solid var(--line);
+  background:var(--bg2); color:var(--fg2); font-size:12.5px;
+}
+.chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.chip .n{opacity:.6; margin-left:5px; font-size:11px}
+.meta-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--fg3); font-size:12px}
+.meta-row select{
+  background:var(--bg2); color:var(--fg2); border:1px solid var(--line);
+  border-radius:8px; padding:6px 10px; font-size:12.5px;
+}
+.fulltoggle{display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none}
+.fulltoggle input{accent-color:var(--accent); width:15px; height:15px}
+
+/* ---------- 読み込み中 ---------- */
+#loading{position:fixed; inset:0; display:grid; place-items:center; background:var(--bg); z-index:90}
+#loading .l{text-align:center; color:var(--fg2); font-size:13.5px}
+#loading .bar{width:170px; height:3px; border-radius:2px; background:var(--bg3); margin:14px auto 0; overflow:hidden}
+#loading .bar i{display:block; width:40%; height:100%; background:var(--accent); animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
+
+/* ---------- 文書カード ---------- */
+.cards{display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+.card{
+  background:var(--bg2); border:1px solid var(--line); border-radius:var(--radius);
+  padding:14px 15px; text-align:left; width:100%; display:flex; flex-direction:column; gap:7px;
+  transition:border-color .15s, transform .15s;
+  /* 画面外のカードは描画を省く（277 枚あるため。無いとスクロールと描画が重い） */
+  content-visibility:auto; contain-intrinsic-size:auto 186px;
+}
+.card:hover{border-color:var(--accent); transform:translateY(-1px)}
+.card.locked{opacity:.62}
+.card.locked:hover{border-color:var(--line); transform:none; cursor:default}
+.card .top{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--fg3)}
+.card .cat{color:var(--accent2)}
+.card h3{margin:0; font-size:14.5px; line-height:1.5; font-weight:700}
+.card .sum{margin:0; font-size:12.5px; color:var(--fg2); line-height:1.65;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
+.card .foot{display:flex; gap:8px; align-items:center; font-size:11px; color:var(--fg3); margin-top:auto; padding-top:4px}
+.tag{padding:2px 7px; border-radius:5px; background:var(--bg3); font-size:10.5px; color:var(--fg2)}
+.tag.lock{background:#3a2230; color:var(--danger)}
+.tag.idx{background:#33301f; color:var(--warn)}
+.empty{text-align:center; color:var(--fg3); padding:50px 20px; font-size:14px}
+
+/* ---------- ツール・自動化 ---------- */
+.grid2{display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+.panel{background:var(--bg2); border:1px solid var(--line); border-radius:var(--radius); padding:15px 16px}
+.panel h3{margin:0 0 4px; font-size:15px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.panel .kind{font-size:11px; color:var(--fg3); font-weight:400}
+.panel p{margin:8px 0 0; font-size:13px; color:var(--fg2)}
+.panel .kv{margin-top:10px; font-size:12px; color:var(--fg3); display:grid; gap:4px}
+.panel .kv b{color:var(--fg2); font-weight:600; margin-right:6px}
+.panel .note{margin-top:10px; font-size:12px; color:var(--warn); background:#241d10;
+  border-left:2px solid var(--warn); padding:8px 10px; border-radius:0 6px 6px 0; line-height:1.6}
+.badge{font-size:10.5px; padding:3px 9px; border-radius:999px; font-weight:700; letter-spacing:.02em}
+.b-live{background:#123324; color:var(--ok)} .b-done{background:#152a3d; color:#7cc7ff}
+.b-frozen{background:#24262e; color:var(--fg3)} .b-empty{background:#2a2226; color:#8a7480}
+.b-unknown{background:#33301f; color:var(--warn)} .b-temporary{background:#2a2440; color:#b39dff}
+.b-retired{background:#2e2024; color:var(--danger)}
+.path{font-family:ui-monospace,"Consolas",monospace; font-size:11px; color:var(--fg3); word-break:break-all}
+.golink{display:inline-block; margin-top:10px; padding:7px 13px; border-radius:8px;
+  background:var(--accent); color:#fff; font-size:12.5px; font-weight:700}
+.golink:hover{text-decoration:none; filter:brightness(1.12)}
+
+h2.sec{font-size:13px; color:var(--fg3); margin:26px 0 10px; letter-spacing:.08em; font-weight:700}
+h2.sec:first-child{margin-top:0}
+
+/* ---------- 年表 ---------- */
+.tl{position:relative; padding-left:20px}
+.tl::before{content:""; position:absolute; left:5px; top:6px; bottom:6px; width:2px; background:var(--line)}
+.tl-m{margin-bottom:22px; position:relative}
+.tl-m::before{content:""; position:absolute; left:-19px; top:7px; width:10px; height:10px;
+  border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px var(--bg)}
+.tl-m h3{margin:0 0 8px; font-size:15px}
+.tl-m h3 span{font-size:11.5px; color:var(--fg3); font-weight:400; margin-left:8px}
+.tl-list{display:grid; gap:5px}
+.tl-item{background:var(--bg2); border:1px solid var(--line); border-radius:8px;
+  padding:8px 12px; font-size:12.5px; text-align:left; width:100%; display:flex; gap:9px; align-items:baseline}
+.tl-item:hover{border-color:var(--accent)}
+.tl-item .d{color:var(--fg3); font-size:11px; flex:0 0 auto; font-variant-numeric:tabular-nums}
+.tl-item .t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+/* ---------- リーダー ---------- */
+#reader{position:fixed; inset:0; z-index:60; background:var(--bg); display:flex; flex-direction:column}
+#reader .rhead{
+  display:flex; align-items:center; gap:10px; padding:10px 14px;
+  padding-top:calc(10px + env(safe-area-inset-top));
+  border-bottom:1px solid var(--line); background:var(--bg2); flex:0 0 auto;
+}
+#reader .rhead button{background:var(--bg3); border:1px solid var(--line); border-radius:8px; padding:8px 13px; font-size:13px}
+#reader .rhead .rt{flex:1; min-width:0; font-size:13.5px; font-weight:700;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+#reader .rbody{flex:1; overflow:auto; -webkit-overflow-scrolling:touch}
+#reader .rinner{max-width:860px; margin:0 auto; padding:22px 18px 80px}
+#reader iframe{width:100%; height:100%; border:0; background:#fff}
+.rmeta{font-size:11.5px; color:var(--fg3); border:1px solid var(--line); background:var(--bg2);
+  border-radius:8px; padding:10px 12px; margin-bottom:22px; display:grid; gap:4px}
+
+/* 本文タイポグラフィ */
+.doc h1{font-size:22px; line-height:1.45; margin:0 0 18px; padding-bottom:12px; border-bottom:2px solid var(--accent)}
+.doc h2{font-size:18px; margin:32px 0 12px; padding-left:10px; border-left:3px solid var(--accent)}
+.doc h3{font-size:15.5px; margin:24px 0 10px; color:var(--accent2)}
+.doc h4{font-size:14px; margin:18px 0 8px; color:var(--fg2)}
+.doc p{margin:0 0 14px}
+.doc ul,.doc ol{margin:0 0 14px; padding-left:24px}
+.doc li{margin-bottom:6px}
+.doc blockquote{margin:0 0 16px; padding:10px 14px; background:var(--bg2);
+  border-left:3px solid var(--fg3); border-radius:0 8px 8px 0; color:var(--fg2); font-size:14px}
+.doc blockquote p:last-child{margin-bottom:0}
+.doc code{background:var(--bg3); padding:2px 6px; border-radius:5px;
+  font-family:ui-monospace,"Consolas",monospace; font-size:.87em; color:var(--accent2)}
+.doc pre{background:var(--bg2); border:1px solid var(--line); border-radius:8px;
+  padding:13px; overflow-x:auto; margin:0 0 16px}
+.doc pre code{background:none; padding:0; color:var(--fg2)}
+.doc table{border-collapse:collapse; width:100%; font-size:13px; margin:0 0 16px}
+.doc .tablewrap{overflow-x:auto; margin:0 0 16px}
+.doc .tablewrap table{margin:0}
+.doc th,.doc td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+.doc th{background:var(--bg3); font-weight:700; white-space:nowrap}
+.doc tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+.doc hr{border:0; border-top:1px solid var(--line); margin:26px 0}
+.doc img{max-width:100%; height:auto; border-radius:8px}
+.doc a{word-break:break-all}
+.doc strong{color:#fff}
+
+@media(max-width:600px){
+  main{padding:14px 12px 50px}
+  .cards{grid-template-columns:1fr}
+  .grid2{grid-template-columns:1fr}
+  #reader .rinner{padding:18px 14px 70px}
+  .doc h1{font-size:19px} .doc h2{font-size:16.5px}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="l">資産カタログを読み込んでいます…<div class="bar"><i></i></div></div>
+</div>
+
+<div id="gate" hidden>
+  <div class="box">
+    <h1>VTuber<span style="color:var(--accent)">資産ポータル</span></h1>
+    <p>社内限定。閲覧パスワードを入力してください。</p>
+    <input id="pw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="パスワード">
+    <button id="unlock">解錠</button>
+    <div class="msg" id="gatemsg"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <div class="hrow">
+      <div class="brand">VTuber<span>資産ポータル</span></div>
+      <div class="built" id="built"></div>
+    </div>
+    <nav id="tabs">
+      <button data-v="docs" aria-selected="true">📊 書庫<span class="n" id="n-docs"></span></button>
+      <button data-v="tools" aria-selected="false">🛠 ツール・サイト<span class="n" id="n-tools"></span></button>
+      <button data-v="auto" aria-selected="false">🤖 自動化<span class="n" id="n-auto"></span></button>
+      <button data-v="timeline" aria-selected="false">📜 年表</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="view-docs">
+      <div class="filters">
+        <div class="search">
+          <input id="q" type="search" placeholder="タイトル・要約・本文を検索（例: ステララボ／準備中／いいね営業）">
+          <button class="clear" id="qclear" hidden>✕</button>
+        </div>
+        <div class="chips" id="cats"></div>
+        <div class="meta-row">
+          <span id="count"></span>
+          <label class="fulltoggle"><input type="checkbox" id="full"> 本文も検索</label>
+          <select id="sort">
+            <option value="date-desc">新しい順</option>
+            <option value="date-asc">古い順</option>
+            <option value="title">タイトル順</option>
+            <option value="size">分量が多い順</option>
+          </select>
+          <select id="year"><option value="">すべての時期</option></select>
+        </div>
+      </div>
+      <div class="cards" id="doclist"></div>
+    </section>
+
+    <section id="view-tools" hidden>
+      <h2 class="sec">🟢 いま動いているサイト</h2>
+      <div class="grid2" id="livesites"></div>
+      <h2 class="sec">📦 プロジェクト一覧</h2>
+      <div class="chips" id="pstatus" style="margin-bottom:12px"></div>
+      <div class="grid2" id="projlist"></div>
+    </section>
+
+    <section id="view-auto" hidden>
+      <h2 class="sec">🤖 定期実行されている処理</h2>
+      <div class="grid2" id="autolist"></div>
+    </section>
+
+    <section id="view-timeline" hidden>
+      <div class="tl" id="tl"></div>
+    </section>
+  </main>
+</div>
+
+<div id="reader" hidden>
+  <div class="rhead">
+    <button id="rback">← 戻る</button>
+    <div class="rt" id="rtitle"></div>
+    <button id="rcopy" title="ファイルパスをコピー">パスをコピー</button>
+  </div>
+  <div class="rbody" id="rbody"></div>
+</div>
+
+<script>
+"use strict";
+const MODE = "publish";           // "local" | "encrypted"
+let DATA = null;
+
+/* ============ 復号（build 側 crypto.py と対。片方を変えたら両方揃えること） ============ */
+function b64d(s){const b=atob(s);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
+async function deriveKey(pw, salt, iter){
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), {name:"PBKDF2"}, false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:iter, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+}
+async function gunzip(buf){
+  if (typeof DecompressionStream === "undefined") throw new Error("この端末は gzip 展開に対応していません");
+  const ds = new DecompressionStream("gzip");
+  const stream = new Blob([buf]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function decryptWithKey(enc, key){
+  let pt = new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM", iv:b64d(enc.iv)}, key, b64d(enc.ciphertext)));
+  if (enc.compress === "gzip") pt = await gunzip(pt);
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+/* 導出済み鍵のキャッシュ（katana / skeb と同じ設計＝**平文パスワードは持たない**）。
+   CryptoKey は extractable:false で作るので、IndexedDB に入っても値を取り出せない。
+   PBKDF2 60万反復はスマホで約1秒かかるため、2回目以降はこれを飛ばして即解錠する。 */
+function _keyId(enc){ return "k:" + (enc.salt || "") + ":" + (enc.iterations || 0); }
+function _idb(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("vtuber-portal-keys", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("keys");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function _idbGet(id){
+  try{
+    const db = await _idb();
+    return await new Promise(res => {
+      const q = db.transaction("keys", "readonly").objectStore("keys").get(id);
+      q.onsuccess = () => res(q.result || null);
+      q.onerror = () => res(null);
+    });
+  }catch(e){ return null; }          // プライベートウィンドウ等では使えない。素通りさせる
+}
+async function _idbPut(id, key){
+  try{
+    const db = await _idb();
+    db.transaction("keys", "readwrite").objectStore("keys").put(key, id);
+  }catch(e){}
+}
+
+/* ============ 起動 ============ */
+async function boot(){
+  const res = await fetch("data.json", {cache:"no-cache"});
+  if(!res.ok) throw new Error("data.json を取得できません ("+res.status+")");
+  const raw = await res.json();
+  if (MODE === "local" || !raw.ciphertext){ DATA = raw; render(); return; }
+
+  // 1) 前回の導出済み鍵があれば PBKDF2（スマホで約1秒）を飛ばして即解錠
+  const cached = await _idbGet(_keyId(raw));
+  if (cached){
+    try{ DATA = await decryptWithKey(raw, cached); render(); return; }
+    catch(e){ /* パスワード変更後などは失敗する。ゲートへ落とす */ }
+  }
+
+  const gate = document.getElementById("gate");
+  document.getElementById("loading").hidden = true;
+  gate.hidden = false;
+  const pwEl = document.getElementById("pw"), msg = document.getElementById("gatemsg");
+  const tryUnlock = async (pw) => {
+    if(!pw) return;
+    msg.textContent = "解錠中…（初回は数秒かかります）";
+    try{
+      const key = await deriveKey(pw, b64d(raw.salt), raw.iterations);
+      DATA = await decryptWithKey(raw, key);
+      await _idbPut(_keyId(raw), key);   // 保存するのは鍵だけ。パスワードは残さない
+      gate.hidden = true; render();
+    }catch(e){
+      msg.textContent = "パスワードが違います";
+    }
+  };
+  msg.textContent = "";
+  document.getElementById("unlock").onclick = () => tryUnlock(pwEl.value.trim());
+  pwEl.onkeydown = e => { if(e.key === "Enter") tryUnlock(pwEl.value.trim()); };
+  pwEl.focus();
+}
+
+/* ============ 描画 ============ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+/** 設定ファイルの注記は Markdown で書かれているので **強調** だけ活かす（エスケープ後に変換）。 */
+const escB = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+let state = {view:"docs", q:"", cat:"", year:"", sort:"date-desc", pstatus:"", full:false};
+let fullIndexed = false;
+
+/** 本文の全文検索索引（重いので必要になった時に1度だけ作る）。 */
+function buildFullIndex(){
+  if(fullIndexed) return;
+  DATA.docs.forEach(d => {
+    d._hay = d._head + " " + (d.body ? d.body.replace(/<[^>]+>/g, " ").toLowerCase() : "");
+  });
+  fullIndexed = true;
+}
+
+function render(){
+  // 軽い索引（タイトル・要約・パス）は常に持つ。打鍵ごとの再計算をしないための前処理。
+  DATA.docs.forEach(d => {
+    d._head = (d.title + " " + d.summary + " " + d.rel + " " + d.category_label).toLowerCase();
+  });
+  $("loading").hidden = true;
+  $("app").hidden = false;
+  $("built").textContent = "更新 " + DATA.generated_at;
+  $("n-docs").textContent = DATA.docs.length;
+  $("n-tools").textContent = DATA.projects.length;
+  $("n-auto").textContent = DATA.automation.length;
+  buildCatChips(); buildYears(); renderDocs();
+  wire();
+}
+
+function wire(){
+  // タブの中身は開かれたときに1度だけ組む。最初から全部組むと DOM が 900 要素を超えて
+  // 描画・スクショが詰まる（2026-08-31 の実機検証で判明）。
+  const built = {};
+  const builders = {tools:buildTools, auto:buildAuto, timeline:buildTimeline};
+  $("tabs").onclick = e => {
+    const b = e.target.closest("button[data-v]"); if(!b) return;
+    state.view = b.dataset.v;
+    if(builders[state.view] && !built[state.view]){ builders[state.view](); built[state.view] = true; }
+    [...$("tabs").children].forEach(x => x.setAttribute("aria-selected", String(x === b)));
+    ["docs","tools","auto","timeline"].forEach(v => $("view-"+v).hidden = (v !== state.view));
+    window.scrollTo(0,0);
+  };
+  const q = $("q");
+  q.oninput = () => { state.q = q.value.trim(); $("qclear").hidden = !state.q; renderDocs(); };
+  $("qclear").onclick = () => { q.value=""; state.q=""; $("qclear").hidden=true; renderDocs(); q.focus(); };
+  $("full").onchange = e => {
+    state.full = e.target.checked;
+    if(state.full && !fullIndexed && state.q){
+      $("count").textContent = "本文を検索中…";
+      setTimeout(() => renderDocs(), 16);   // 索引作成の前に画面を1度描かせる
+      return;
+    }
+    renderDocs();
+  };
+  $("sort").onchange = e => { state.sort = e.target.value; renderDocs(); };
+  $("year").onchange = e => { state.year = e.target.value; renderDocs(); };
+  $("rback").onclick = closeReader;
+  document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("reader").hidden) closeReader(); });
+}
+
+function buildCatChips(){
+  const counts = {};
+  DATA.docs.forEach(d => counts[d.category] = (counts[d.category]||0)+1);
+  const el = $("cats");
+  el.innerHTML = `<button class="chip" data-c="" aria-pressed="true">すべて<span class="n">${DATA.docs.length}</span></button>` +
+    DATA.categories.filter(c => counts[c.id]).map(c =>
+      `<button class="chip" data-c="${esc(c.id)}" aria-pressed="false" title="${esc(c.desc)}">${c.icon} ${esc(c.label)}<span class="n">${counts[c.id]}</span></button>`
+    ).join("") +
+    (counts["other"] ? `<button class="chip" data-c="other" aria-pressed="false">📄 その他<span class="n">${counts["other"]}</span></button>` : "");
+  el.onclick = e => {
+    const b = e.target.closest(".chip"); if(!b) return;
+    state.cat = b.dataset.c;
+    [...el.children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    renderDocs();
+  };
+}
+
+function buildYears(){
+  const months = [...new Set(DATA.docs.map(d => d.date.slice(0,7)))].sort().reverse();
+  $("year").innerHTML = '<option value="">すべての時期</option>' +
+    months.map(m => `<option value="${m}">${m.replace("-","年")}月</option>`).join("");
+}
+
+function filtered(){
+  let out = DATA.docs;
+  if(state.cat) out = out.filter(d => d.category === state.cat);
+  if(state.year) out = out.filter(d => d.date.startsWith(state.year));
+  if(state.q){
+    const terms = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+    // 本文検索は索引を1度だけ作る。毎打鍵で 8MB を連結・小文字化すると描画が固まる
+    // （2026-08-31 の実機検証でレンダラが 30 秒無応答になり発覚）。
+    if(state.full) buildFullIndex();
+    out = out.filter(d => {
+      const hay = state.full ? d._hay : d._head;
+      return terms.every(t => hay.includes(t));
+    });
+  }
+  const s = state.sort;
+  out = [...out].sort((a,b) =>
+    s === "date-asc" ? a.date.localeCompare(b.date) :
+    s === "title"    ? a.title.localeCompare(b.title, "ja") :
+    s === "size"     ? b.bytes - a.bytes :
+                       b.date.localeCompare(a.date));
+  return out;
+}
+
+function renderDocs(){
+  const list = filtered();
+  $("count").textContent = `${list.length} 件`;
+  if(!list.length){ $("doclist").innerHTML = `<div class="empty">該当する文書がありません。<br>検索語を減らすか、カテゴリを「すべて」に戻してください。</div>`; return; }
+  $("doclist").innerHTML = list.map(d => {
+    const readable = !!d.body;
+    // バッジは「公開版でどう扱われるか」を示す。ローカル版では全 tier が読める。
+    const local = DATA.mode === "local";
+    const lock = d.tier === 3 ? `<span class="tag lock">${local ? "公開版では非掲載" : "非掲載"}</span>`
+               : d.tier === 2 ? `<span class="tag idx">${local ? "公開版は索引のみ" : "索引のみ"}</span>` : "";
+    const att = (d.attachments||[]).map(a => `<span class="tag">${esc(a.toUpperCase())}</span>`).join("");
+    return `<button class="card ${readable?"":"locked"}" data-id="${esc(d.id)}" ${readable?"":"disabled"}>
+      <div class="top"><span class="cat">${esc(d.category_label)}</span><span>·</span><span>${esc(d.date)}</span></div>
+      <h3>${esc(d.title)}</h3>
+      <p class="sum">${esc(d.summary)}</p>
+      <div class="foot"><span class="tag">${esc(d.root_label)}</span>${lock}${att}
+        <span style="margin-left:auto">${readable ? "読む →" : "本文なし"}</span></div>
+    </button>`;
+  }).join("");
+  $("doclist").onclick = e => {
+    const c = e.target.closest(".card[data-id]"); if(!c || c.disabled) return;
+    openReader(c.dataset.id);
+  };
+}
+
+function openReader(id){
+  const d = DATA.docs.find(x => x.id === id); if(!d) return;
+  $("rtitle").textContent = d.title;
+  $("rcopy").onclick = () => {
+    navigator.clipboard?.writeText(d.path).then(
+      () => { $("rcopy").textContent = "コピーしました"; setTimeout(()=>$("rcopy").textContent="パスをコピー", 1600); },
+      () => {});
+  };
+  const body = $("rbody");
+  if(d.body_kind === "iframe"){
+    body.innerHTML = "";
+    const f = document.createElement("iframe");
+    f.setAttribute("sandbox", "allow-scripts allow-popups");
+    f.srcdoc = d.body;
+    body.appendChild(f);
+  }else{
+    body.innerHTML = `<div class="rinner">
+      <div class="rmeta">
+        <div><b>分類</b> ${esc(d.category_label)} ／ ${esc(d.root_label)}</div>
+        <div><b>日付</b> ${esc(d.date)}（最終更新 ${esc(d.mtime)}）</div>
+        <div><b>元ファイル</b> <span class="path">${esc(d.rel)}</span></div>
+      </div>
+      <div class="doc">${d.body}</div></div>`;
+    body.querySelectorAll(".doc table").forEach(t => {
+      if(t.parentElement.classList.contains("tablewrap")) return;
+      const w = document.createElement("div"); w.className = "tablewrap";
+      t.parentNode.insertBefore(w, t); w.appendChild(t);
+    });
+  }
+  body.scrollTop = 0;
+  $("reader").hidden = false;
+  document.body.style.overflow = "hidden";
+  history.pushState({reader:1}, "");
+}
+function closeReader(){
+  $("reader").hidden = true;
+  $("rbody").innerHTML = "";
+  document.body.style.overflow = "";
+}
+window.addEventListener("popstate", () => { if(!$("reader").hidden) closeReader(); });
+
+/* ---------- ツール・サイト ---------- */
+const SLABEL = {live:"稼働中", done:"完了・現役参照", frozen:"凍結・停止", empty:"空", unknown:"要確認",
+                temporary:"期間限定", retired:"廃止"};
+function projCard(p){
+  const url = p.url ? `<a class="golink" href="${esc(p.url)}" target="_blank" rel="noopener">開く ↗</a>` : "";
+  const kv = [
+    p.what ? "" : "",
+    p.update ? `<div><b>更新</b>${esc(p.update)}</div>` : "",
+    p.auth ? `<div><b>保護</b>${esc(p.auth)}</div>` : "",
+    p.repo ? `<div><b>repo</b>${esc(p.repo)}${p.repo_note ? "（"+esc(p.repo_note)+"）" : ""}</div>` : "",
+    p.skill ? `<div><b>スキル</b>${esc(p.skill)}</div>` : "",
+    p.last_change ? `<div><b>最終変更</b>${esc(p.last_change)}</div>` : "",
+    `<div><b>場所</b><span class="path">${esc(p.path||"")}</span></div>`,
+    p.url_note ? `<div><b>URL</b>${esc(p.url_note)}</div>` : "",
+  ].filter(Boolean).join("");
+  const note = [p.status_note, p.note].filter(Boolean).map(n => `<div class="note">${escB(n)}</div>`).join("");
+  return `<div class="panel">
+    <h3>${esc(p.name)} <span class="badge b-${esc(p.status)}">${esc(SLABEL[p.status]||p.status)}</span>
+      <span class="kind">${esc(p.kind||"")}</span></h3>
+    <p>${esc(p.what||"")}</p>
+    <div class="kv">${kv}</div>${note}${url}</div>`;
+}
+function buildTools(){
+  const live = DATA.projects.filter(p => p.status === "live" && p.url);
+  $("livesites").innerHTML = live.map(projCard).join("") || `<div class="empty">公開中のサイトはありません</div>`;
+  const counts = {};
+  DATA.projects.forEach(p => counts[p.status] = (counts[p.status]||0)+1);
+  const order = ["live","done","unknown","frozen","empty"];
+  $("pstatus").innerHTML = `<button class="chip" data-s="" aria-pressed="true">すべて<span class="n">${DATA.projects.length}</span></button>` +
+    order.filter(s => counts[s]).map(s =>
+      `<button class="chip" data-s="${s}" aria-pressed="false">${SLABEL[s]}<span class="n">${counts[s]}</span></button>`).join("");
+  const draw = () => {
+    const sel = state.pstatus ? DATA.projects.filter(p => p.status === state.pstatus) : DATA.projects;
+    $("projlist").innerHTML = sel.map(projCard).join("");
+  };
+  $("pstatus").onclick = e => {
+    const b = e.target.closest(".chip"); if(!b) return;
+    state.pstatus = b.dataset.s;
+    [...$("pstatus").children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    draw();
+  };
+  draw();
+}
+function buildAuto(){
+  $("autolist").innerHTML = DATA.automation.map(a => `<div class="panel">
+    <h3>${esc(a.name)} <span class="badge b-${esc(a.status)}">${esc(SLABEL[a.status]||a.status)}</span></h3>
+    <p>${esc(a.what||"")}</p>
+    <div class="kv"><div><b>実行</b>${esc(a.when)}</div><div><b>仕組み</b>${esc(a.how)}</div>
+      <div><b>ID</b><span class="path">${esc(a.id)}</span></div></div></div>`).join("");
+}
+
+/* ---------- 年表 ---------- */
+function buildTimeline(){
+  const by = {};
+  DATA.docs.forEach(d => (by[d.date.slice(0,7)] ||= []).push(d));
+  const months = Object.keys(by).sort().reverse();
+  $("tl").innerHTML = months.map(m => {
+    const items = by[m].sort((a,b) => b.date.localeCompare(a.date));
+    return `<div class="tl-m"><h3>${m.replace("-","年")}月<span>${items.length} 件</span></h3>
+      <div class="tl-list">${items.map(d =>
+        `<button class="tl-item" data-id="${esc(d.id)}" ${d.body?"":"disabled"}>
+          <span class="d">${esc(d.date.slice(8))}日</span>
+          <span class="t">${esc(d.title)}</span></button>`).join("")}</div></div>`;
+  }).join("");
+  $("tl").onclick = e => {
+    const b = e.target.closest(".tl-item[data-id]"); if(!b || b.disabled) return;
+    openReader(b.dataset.id);
+  };
+}
+
+boot().catch(e => {
+  document.body.innerHTML = `<div class="empty" style="padding-top:80px">
+    読み込みに失敗しました<br><span class="path">${esc(e.message)}</span></div>`;
+});
+</script>
+</body>
+</html>
