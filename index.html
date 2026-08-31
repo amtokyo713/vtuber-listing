@@ -209,9 +209,14 @@ section[hidden]{display:none}
 .b-unknown{background:#33301f; color:var(--warn)} .b-temporary{background:#2a2440; color:#b39dff}
 .b-retired{background:#2e2024; color:var(--danger)}
 .path{font-family:ui-monospace,"Consolas",monospace; font-size:11px; color:var(--fg3); word-break:break-all}
-.golink{display:inline-block; margin-top:10px; padding:8px 14px; border-radius:8px;
+.golink{display:inline-block; padding:8px 14px; border-radius:8px; border:0;
   background:var(--accent); color:#fff; font-size:12.5px; font-weight:700}
 .golink:hover{text-decoration:none; filter:brightness(1.12)}
+.sublink{padding:8px 13px; border-radius:8px; border:1px solid var(--line);
+  background:var(--bg3); color:var(--fg2); font-size:12.5px}
+.sublink:hover{border-color:var(--accent2); color:var(--fg)}
+.acts2{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+.acts2:empty{display:none}
 
 h2.sec{font-size:13px; color:var(--fg3); margin:26px 0 10px; letter-spacing:.08em; font-weight:700}
 h2.sec:first-child{margin-top:0}
@@ -399,6 +404,7 @@ h2.sec:first-child{margin-top:0}
   <div class="rhead">
     <button id="rback">← 戻る</button>
     <div class="rt" id="rtitle" title="タップで全文表示"></div>
+    <button id="rfull" hidden title="別タブで原寸表示">全画面 ↗</button>
     <button id="rcopy" title="ファイルパスをコピー">パスをコピー</button>
   </div>
   <div class="rbody" id="rbody"></div>
@@ -516,7 +522,7 @@ const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<"
 /** 設定ファイルの注記は Markdown で書かれているので **強調** だけ活かす（エスケープ後に変換）。 */
 const escB = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 let state = {view:"docs", q:"", cat:"", year:"", days:0, sort:"date-desc", pstatus:"",
-             full:false, readable:false, newOnly:false};
+             full:false, readable:false, newOnly:false, proj:""};
 let fullIndexed = false;
 let NEW_IDS = new Set();          // 前回訪問以降に増えた文書
 const LS_SEEN = "vp:seen";
@@ -734,9 +740,14 @@ function catLabel(id){
   return c ? c.label : id;
 }
 /** いま効いている絞り込み。0 件のときに「何のせいで 0 件なのか」を出すために使う。 */
+function projName(id){
+  const p = (DATA.projects || []).find(x => x.id === id);
+  return p ? p.name : id;
+}
 function activeConds(){
   const c = [];
   if(state.q) c.push(`検索「${state.q}」${state.full ? "（本文含む）" : "（タイトル・要約）"}`);
+  if(state.proj) c.push(`プロジェクト「${projName(state.proj)}」`);
   if(state.cat) c.push(`カテゴリ「${catLabel(state.cat)}」`);
   if(state.days) c.push(`直近${state.days}日`);
   if(state.year) c.push(`${state.year.replace("-","年")}月`);
@@ -746,6 +757,7 @@ function activeConds(){
 }
 function clearAllFilters(){
   state.q = ""; state.cat = ""; state.year = ""; state.days = 0; state.newOnly = false; state.readable = false;
+  state.proj = "";
   $("q").value = ""; $("qclear").hidden = true; $("year").value = ""; $("readable").checked = false;
   [...$("cats").children].forEach((x,i) => x.setAttribute("aria-pressed", String(i === 0)));
   syncQuick(); renderDocs();
@@ -753,6 +765,10 @@ function clearAllFilters(){
 
 function filtered(){
   let out = DATA.docs;
+  if(state.proj){
+    const p = (DATA.projects || []).find(x => x.id === state.proj);
+    if(p) out = projDocs(p);
+  }
   if(state.cat) out = out.filter(d => d.category === state.cat);
   if(state.year) out = out.filter(d => d.date.startsWith(state.year));
   if(state.days){ const c = cutoff(state.days); out = out.filter(d => d.date >= c); }
@@ -830,8 +846,21 @@ function openReader(id){
       () => { $("rcopy").textContent = "コピーしました"; setTimeout(()=>$("rcopy").textContent="パスをコピー", 1600); },
       () => { $("rcopy").textContent = "コピーできません"; setTimeout(()=>$("rcopy").textContent="パスをコピー", 1600); });
   };
+  // HTML 成果物（レポート・モック）は枠の中だと読みづらいので、別タブで原寸表示できるようにする。
+  // 元ファイルは端末にしか無くスマホからは開けないため、埋め込み済みの本文から Blob を作って開く。
+  // 注: blob: はこのページのオリジンを継承するので iframe のサンドボックスは効かない。
+  // 中身は自分で書いた HTML だけなので許容する（外部由来の HTML をここに入れないこと）。
+  const isHtml = d.body_kind === "iframe";
+  $("rfull").hidden = !isHtml;
+  if(isHtml){
+    $("rfull").onclick = () => {
+      const u = URL.createObjectURL(new Blob([d.body], {type:"text/html"}));
+      window.open(u, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+    };
+  }
   const body = $("rbody");
-  if(d.body_kind === "iframe"){
+  if(isHtml){
     body.innerHTML = "";
     const f = document.createElement("iframe");
     f.setAttribute("sandbox", "allow-scripts allow-popups");
@@ -872,8 +901,33 @@ window.addEventListener("popstate", () => { if(!$("reader").hidden) closeReader(
 /* ---------- ツール・サイト ---------- */
 const SLABEL = {live:"稼働中", done:"完了・現役参照", frozen:"凍結・停止", empty:"空", unknown:"要確認",
                 temporary:"期間限定", retired:"廃止"};
+/** プロジェクトの置き場に入っている書庫の文書。パス区切りが `\` と `/` で混在するので正規化して前方一致。 */
+const _np = s => String(s||"").replace(/\\/g, "/").toLowerCase();
+function projDocs(p){
+  if(!p.path) return [];
+  const base = _np(p.path).replace(/\/+$/, "") + "/";
+  return DATA.docs.filter(d => _np(d.path).startsWith(base));
+}
 function projCard(p){
   const url = p.url ? `<a class="golink" href="${esc(p.url)}" target="_blank" rel="noopener">開く ↗</a>` : "";
+  // ローカルのフォルダは URL が無く、場所の文字列だけでは中身に辿り着けなかった。
+  // 書庫に取り込めているものは、カードから直接読めるようにする。
+  const docs = projDocs(p);
+  let jump = "";
+  if(docs.length){
+    const main = p.main_doc ? docs.find(d => _np(d.rel).endsWith(_np(p.main_doc))) : null;
+    const readable = main && main.body ? main : docs.find(d => d.body);
+    if(readable) jump += `<button class="golink" data-open="${esc(readable.id)}">${main ? "レポートを読む" : "資料を読む"} →</button>`;
+    if(docs.length > 1) jump += `<button class="sublink" data-proj="${esc(p.id)}">資料 ${docs.length} 件をすべて見る</button>`;
+  }
+  return `<div class="panel">
+    <h3>${esc(p.name)} <span class="badge b-${esc(p.status)}">${esc(SLABEL[p.status]||p.status)}</span>
+      <span class="kind">${esc(p.kind||"")}</span></h3>
+    <p>${esc(p.what||"")}</p>
+    <div class="kv">${projKv(p)}</div>${projNote(p)}
+    <div class="acts2">${url}${jump}</div></div>`;
+}
+function projKv(p){
   const kv = [
     p.update ? `<div><b>更新</b>${esc(p.update)}</div>` : "",
     p.auth ? `<div><b>保護</b>${esc(p.auth)}</div>` : "",
@@ -883,12 +937,10 @@ function projCard(p){
     `<div><b>場所</b><span class="path">${esc(p.path||"")}</span></div>`,
     p.url_note ? `<div><b>URL</b>${esc(p.url_note)}</div>` : "",
   ].filter(Boolean).join("");
-  const note = [p.status_note, p.note].filter(Boolean).map(n => `<div class="note">${escB(n)}</div>`).join("");
-  return `<div class="panel">
-    <h3>${esc(p.name)} <span class="badge b-${esc(p.status)}">${esc(SLABEL[p.status]||p.status)}</span>
-      <span class="kind">${esc(p.kind||"")}</span></h3>
-    <p>${esc(p.what||"")}</p>
-    <div class="kv">${kv}</div>${note}${url}</div>`;
+  return kv;
+}
+function projNote(p){
+  return [p.status_note, p.note].filter(Boolean).map(n => `<div class="note">${escB(n)}</div>`).join("");
 }
 function buildTools(){
   // 稼働中サイトは「開く」だけの1行に。詳細は下のプロジェクト一覧が持つので二重に並べない。
@@ -915,7 +967,23 @@ function buildTools(){
     [...$("pstatus").children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
     draw();
   };
+  // カードから 1 クリックで本文へ / そのプロジェクトの資料一覧へ
+  $("projlist").onclick = e => {
+    const open = e.target.closest("button[data-open]");
+    if(open){ openReader(open.dataset.open); return; }
+    const pj = e.target.closest("button[data-proj]");
+    if(pj) showProject(pj.dataset.proj);
+  };
   draw();
+}
+
+/** 書庫タブへ移り、そのプロジェクトの資料だけに絞り込む。 */
+function showProject(id){
+  clearAllFilters();
+  state.proj = id;
+  document.querySelector('#tabs button[data-v="docs"]').click();
+  renderDocs();
+  window.scrollTo(0, 0);
 }
 function buildAuto(){
   $("autolist").innerHTML = DATA.automation.map(a => `<div class="panel">
