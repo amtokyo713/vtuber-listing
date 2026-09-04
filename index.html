@@ -896,12 +896,17 @@ function dataWarning(d){
   const need = d.needs_data || [];
   if(!need.length) return null;
   const p = docProject(d);
+  // 公開 URL が指すのはプロジェクトの**主成果物**だけ。同じフォルダの別ファイル（社内
+  // ダッシュボード等）は公開サイトに置かれていないので、押しても違うページに着く。
+  // 実測 2026-09-04: pages.dev は未知のパスにも 200 を返すため、404 で気づけない。
+  const live = p && p.url && p.main_doc && _np(d.rel).endsWith(_np(p.main_doc)) ? p.url : "";
   const shown = need.slice(0, 4).join(" / ") + (need.length > 4 ? ` ほか ${need.length - 4} 件` : "");
   const el = document.createElement("div");
   el.className = "rwarn";
   el.innerHTML = `<b>⚠ この成果物は中身を別ファイルから読み込みます（書庫の中では一覧が空になります）</b>
     <p>書庫に取り込んでいるのはページ本体だけです。読み込み先: <span class="path">${esc(shown)}</span></p>
-    ${p && p.url ? `<p><a class="golink" href="${esc(p.url)}" target="_blank" rel="noopener">最新版を公開サイトで開く ↗</a></p>` : ""}
+    ${live ? `<p><a class="golink" href="${esc(live)}" target="_blank" rel="noopener">最新版を公開サイトで開く ↗</a></p>`
+           : `<p>このページは公開サイトには置かれていません。中身を見るには PC の元ファイルを開いてください。</p>`}
     <p class="path">元ファイル: ${esc(d.rel)}</p>`;
   return el;
 }
