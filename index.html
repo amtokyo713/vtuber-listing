@@ -467,6 +467,31 @@ async function _idbPut(id, key){
 }
 
 /* ============ 起動 ============ */
+
+/** 読み込み・描画に失敗したときの最終画面。
+    standalone（ホーム画面から起動）だとリロード UI が無いので再試行手段を必ず残す。
+    **原因を必ず出す**こと: 黙って空の画面になると「データが全部消えた」としか見えず、
+    サーバ側の障害と端末側の障害を切り分けられない（2026-09-04 の調査で判明）。 */
+function fatal(e){
+  const line = e && e.stack ? String(e.stack).split("\n").slice(0,2).join(" / ") : "";
+  const detail = (e && e.message ? e.message : String(e)) + (line ? "  [" + line + "]" : "");
+  document.body.innerHTML = `<div class="empty" style="padding-top:80px">
+    読み込みに失敗しました<br><span class="path">${esc(detail)}</span>
+    <div class="acts" style="display:flex; justify-content:center; gap:10px; margin-top:20px">
+      <button class="primary" id="retry" style="padding:10px 18px; border-radius:9px; border:0; background:#7c5cff; color:#fff; font-weight:700">再読み込み</button>
+      <button id="hardreset" style="padding:10px 18px; border-radius:9px">保存データを消して再試行</button>
+    </div></div>`;
+  const r = document.getElementById("retry");
+  if(r) r.onclick = () => location.reload();
+  // 端末に残った鍵・既読状態が壊れている場合の自力復旧（パスワードの再入力が必要になる）。
+  const h = document.getElementById("hardreset");
+  if(h) h.onclick = async () => {
+    try{ localStorage.removeItem(LS_SEEN); }catch(err){}
+    try{ indexedDB.deleteDatabase("vtuber-portal-keys"); }catch(err){}
+    setTimeout(() => location.reload(), 300);
+  };
+}
+
 async function boot(){
   const res = await fetch("data.json", {cache:"no-cache"});
   if(!res.ok) throw new Error("data.json を取得できません ("+res.status+")");
@@ -474,10 +499,14 @@ async function boot(){
   if (MODE === "local" || !raw.ciphertext){ DATA = raw; render(); return; }
 
   // 1) 前回の導出済み鍵があれば PBKDF2（スマホで約1秒）を飛ばして即解錠
+  // 復号と描画を**別の try に分ける**。同じ try に入れると描画の失敗まで「鍵が古い」と
+  // 誤判定してゲートへ落ち、正しいパスワードでも「パスワードが違います」になる。
   const cached = await _idbGet(_keyId(raw));
   if (cached){
-    try{ DATA = await decryptWithKey(raw, cached); render(); return; }
+    let payload = null;
+    try{ payload = await decryptWithKey(raw, cached); }
     catch(e){ /* パスワード変更後などは失敗する。ゲートへ落とす */ }
+    if (payload){ DATA = payload; render(); return; }   // 描画の失敗は boot().catch → fatal() へ
   }
 
   const gate = document.getElementById("gate");
@@ -489,17 +518,27 @@ async function boot(){
     if(!pw || btn.disabled) return;
     btn.disabled = true;                       // PBKDF2 の1秒間に連打すると鍵導出が多重に走る
     msg.textContent = "解錠中…（初回は数秒かかります）";
+    let payload = null;
     try{
       const key = await deriveKey(pw, b64d(raw.salt), raw.iterations);
-      DATA = await decryptWithKey(raw, key);
+      payload = await decryptWithKey(raw, key);
       await _idbPut(_keyId(raw), key);   // 保存するのは鍵だけ。パスワードは残さない
-      gate.hidden = true; render();
     }catch(e){
       msg.textContent = e && e.code === "NOGZIP"
         ? "この端末は表示に必要な機能（gzip 展開）に未対応です。別のブラウザでお試しください"
         : "パスワードが違います";
+      return;
     }finally{
       btn.disabled = false;
+    }
+    // 復号は成功。ここから先の失敗は「パスワードが違う」ではないので、
+    // ゲートに嘘を出さず fatal() で原因ごと見せる（黙って空画面にしない）。
+    try{
+      DATA = payload;
+      gate.hidden = true;
+      render();
+    }catch(e){
+      fatal(e);
     }
   };
   msg.textContent = "";
@@ -1013,16 +1052,7 @@ function buildTimeline(){
   };
 }
 
-boot().catch(e => {
-  // standalone（ホーム画面から起動）だとリロード UI が無い。再試行手段を必ず残す。
-  document.body.innerHTML = `<div class="empty" style="padding-top:80px">
-    読み込みに失敗しました<br><span class="path">${esc(e.message)}</span>
-    <div class="acts" style="display:flex; justify-content:center; margin-top:20px">
-      <button class="primary" id="retry" style="padding:10px 18px; border-radius:9px; border:0; background:#7c5cff; color:#fff; font-weight:700">再読み込み</button>
-    </div></div>`;
-  const r = document.getElementById("retry");
-  if(r) r.onclick = () => location.reload();
-});
+boot().catch(fatal);
 </script>
 </body>
 </html>
