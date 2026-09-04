@@ -255,6 +255,14 @@ h2.sec:first-child{margin-top:0}
 #reader .rbody{flex:1; overflow:auto; -webkit-overflow-scrolling:touch}
 #reader .rinner{max-width:860px; margin:0 auto; padding:22px 18px 80px}
 #reader iframe{width:100%; height:100%; border:0; background:#fff}
+/* 注意書きと埋め込みを縦に積む。iframe の height:100% だけだと注意書きの分だけはみ出す。 */
+#reader .rstack{display:flex; flex-direction:column; height:100%}
+#reader .rstack iframe{flex:1; height:auto; min-height:240px}
+.rwarn{margin:12px 12px 0; padding:12px 14px; border-radius:10px; line-height:1.65;
+  background:#3a2a12; color:#ffd9a0; font-size:12.5px; border:1px solid #6b4a17}
+.rwarn b{display:block; margin-bottom:6px; font-size:13px}
+.rwarn p{margin:6px 0}
+.rwarn .path{color:#d8b98a; word-break:break-all}
 .rmeta{font-size:11.5px; color:var(--fg3); border:1px solid var(--line); background:var(--bg2);
   border-radius:8px; padding:10px 12px; margin-bottom:22px; display:grid; gap:4px}
 
@@ -876,6 +884,28 @@ function renderDocs(){
   };
 }
 
+/** その文書を置いてあるプロジェクト（パス前方一致）。公開サイトへの導線に使う。 */
+function docProject(d){
+  return (DATA.projects || []).find(p =>
+    p.path && _np(d.path).startsWith(_np(p.path).replace(/\/+$/, "") + "/"));
+}
+/** `viewer.html` のように**同じフォルダの JSON を読み込む**成果物は、書庫にページ本体だけを
+    取り込んでも中身が空で表示される（隣のデータが無いため）。理由を出さずに空の画面だけ見せると
+    「データが全部消えた」としか読めないので、原因と代わりの導線を必ず添える（2026-09-04 の報告）。 */
+function dataWarning(d){
+  const need = d.needs_data || [];
+  if(!need.length) return null;
+  const p = docProject(d);
+  const shown = need.slice(0, 4).join(" / ") + (need.length > 4 ? ` ほか ${need.length - 4} 件` : "");
+  const el = document.createElement("div");
+  el.className = "rwarn";
+  el.innerHTML = `<b>⚠ この成果物は中身を別ファイルから読み込みます（書庫の中では一覧が空になります）</b>
+    <p>書庫に取り込んでいるのはページ本体だけです。読み込み先: <span class="path">${esc(shown)}</span></p>
+    ${p && p.url ? `<p><a class="golink" href="${esc(p.url)}" target="_blank" rel="noopener">最新版を公開サイトで開く ↗</a></p>` : ""}
+    <p class="path">元ファイル: ${esc(d.rel)}</p>`;
+  return el;
+}
+
 function openReader(id){
   const d = DATA.docs.find(x => x.id === id); if(!d) return;
   const t = $("rtitle");
@@ -901,10 +931,15 @@ function openReader(id){
   const body = $("rbody");
   if(isHtml){
     body.innerHTML = "";
+    const stack = document.createElement("div");
+    stack.className = "rstack";
+    const warn = dataWarning(d);          // データ駆動の成果物は、空に見える理由を先に出す
+    if(warn) stack.appendChild(warn);
     const f = document.createElement("iframe");
     f.setAttribute("sandbox", "allow-scripts allow-popups");
     f.srcdoc = d.body;
-    body.appendChild(f);
+    stack.appendChild(f);
+    body.appendChild(stack);
   }else{
     body.innerHTML = `<div class="rinner">
       <div class="rmeta">
