@@ -1,0 +1,1663 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d0f14">
+<title>VTuber資産ポータル</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{
+  --bg:#0d0f14;
+  --raise:#14171e;
+  --raise2:#1b1f28;
+  --line:#252a35;
+  --line2:#353b49;
+  --text:#ebe8e2;
+  --muted:#a4aab6;
+  --faint:#838a99;
+  --accent:#dba35a;
+  --accent-ink:#1a1306;
+  --accent-soft:rgba(219,163,90,.13);
+  --accent-line:rgba(219,163,90,.5);
+  --shadow:0 8px 24px rgba(8,10,14,.65);
+  --gutter:16px;
+  --nav-h:60px;
+  --font:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;color-scheme:dark;overflow-x:clip}
+html.lock{overflow:hidden}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.7;overflow-wrap:anywhere;-webkit-tap-highlight-color:transparent}
+a{color:inherit}
+a,button,summary,.chip,label{touch-action:manipulation}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main:focus{outline:none}
+h1,h2,h3,p,ul,ol,dl,dd{margin:0}
+ul,ol{padding:0;list-style:none}
+/* id セレクタの display 指定は UA の [hidden]{display:none} を特異性で上回るため、
+   hidden 属性が効かなくなる。全要素に対して明示的に打ち消す（2026-08-31 実機検証で
+   ローカル版なのにパスワードゲートが出続けて発覚）。 */
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.clamp3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+svg{flex:none}
+mark{background:var(--accent-soft);color:inherit;border-radius:3px;padding:0 1px;box-shadow:inset 0 -2px 0 var(--accent-line)}
+
+/* ---------- パスワードゲート ---------- */
+#gate{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:100;padding:20px}
+#gate .box{width:min(400px,100%);text-align:center}
+#gate h1{font-size:20px;margin:0 0 6px;letter-spacing:.04em}
+#gate p{color:var(--muted);font-size:14px;margin:0 0 22px}
+#gate .pwwrap{position:relative}
+/* 左右対称の padding にして、目アイコンを足しても入力文字の中央寄せが崩れないようにする。
+   16px 未満だと iOS が入力フォーカスで画面を自動ズームするため下げない。 */
+#gate input{
+  width:100%;height:52px;padding:0 52px;border-radius:12px;border:1px solid var(--line2);
+  background:var(--raise);color:var(--text);font-family:inherit;font-size:16px;text-align:center;letter-spacing:.2em;
+}
+#gate input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+#gate input::placeholder{letter-spacing:.05em;color:var(--faint)}
+#gate .eye{
+  position:absolute;right:0;top:0;width:52px;height:52px;display:flex;align-items:center;justify-content:center;
+  background:none;border:0;padding:0;font-size:18px;line-height:1;color:var(--muted);
+}
+#gate button[type="submit"]{
+  width:100%;min-height:52px;margin-top:12px;padding:0 16px;border:0;border-radius:12px;
+  background:var(--accent);color:var(--accent-ink);font-size:16px;font-weight:700;
+}
+#gate button[type="submit"]:disabled{opacity:.6;cursor:default}
+#gate .msg{margin-top:14px;font-size:14px;min-height:22px;color:var(--accent)}
+
+/* ---------- 読み込み中 ---------- */
+#loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:90}
+#loading .l{text-align:center;color:var(--muted);font-size:14px}
+#loading .bar{width:170px;height:3px;border-radius:2px;background:var(--raise2);margin:14px auto 0;overflow:hidden}
+#loading .bar i{display:block;width:100%;height:100%;background:var(--accent);opacity:.55}
+@media (prefers-reduced-motion:no-preference){
+  #loading .bar i{width:40%;opacity:1;animation:slide 1.1s ease-in-out infinite}
+  @keyframes slide{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
+}
+
+/* ---------- 読み込み失敗の最終画面（fatal() が使う） ---------- */
+.empty{text-align:center;color:var(--muted);padding:44px 20px 50px;font-size:15px}
+.path{font-family:ui-monospace,"Consolas",monospace;font-size:12px;color:var(--faint);word-break:break-all}
+#retry{background:var(--accent)!important;color:var(--accent-ink)!important;min-height:44px}
+#hardreset{background:var(--raise2);border:1px solid var(--line2);color:var(--text);min-height:44px}
+
+/* ---------- 上の帯 ---------- */
+.top{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;height:56px;padding:0 var(--gutter);background:var(--bg);border-bottom:1px solid var(--line)}
+.brand-m{font-weight:700;font-size:16px;letter-spacing:.02em}
+.back{display:inline-flex;align-items:center;gap:2px;min-height:44px;margin-left:-8px;padding:0 12px 0 6px;background:none;border:0;border-radius:10px;color:var(--text);font-size:15px}
+.search-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px 0 12px;border:1px solid var(--line2);border-radius:22px;background:var(--raise);color:var(--text);font-size:16px}
+.search-btn .hint{display:none;color:var(--muted)}
+
+/* ---------- 下の固定ナビ（PC では左の縦ナビ） ---------- */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;background:#11141a;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.tabs .brand-d{display:none}
+.tabs a{flex:1;min-width:0;min-height:var(--nav-h);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--faint);font-size:12px;line-height:1.3;text-decoration:none;white-space:nowrap}
+.tabs a[aria-current="page"]{color:var(--accent);box-shadow:inset 0 2px 0 var(--accent)}
+.tabs svg{width:24px;height:24px}
+
+/* ---------- 本文の枠 ---------- */
+.page{max-width:1000px;margin:0 auto;padding:20px var(--gutter) calc(var(--nav-h) + 36px + env(safe-area-inset-bottom))}
+.head{margin-bottom:8px}
+h1{font-size:24px;line-height:1.35;font-weight:700}
+.sub{margin-top:2px;color:var(--muted);font-size:14px;line-height:1.6}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin:22px 0 6px}
+h2{font-size:17px;line-height:1.4;font-weight:700}
+.more{display:inline-flex;align-items:center;min-height:44px;padding:0 4px 0 12px;color:var(--accent);font-size:14px;text-decoration:none;background:none;border:0}
+.note{margin:6px 0 0;color:var(--faint);font-size:13px;line-height:1.6}
+
+/* ---------- 小さな印 ---------- */
+.role{display:inline-block;padding:0 8px;border:1px solid var(--line2);border-radius:6px;color:var(--muted);font-size:12px;font-weight:400;line-height:22px;white-space:nowrap}
+.role.talent{border-color:var(--accent-line);color:var(--accent)}
+.tag{display:inline-block;padding:0 8px;border-radius:6px;background:var(--raise2);color:var(--muted);font-size:12px;line-height:22px}
+.tag.lock{color:var(--text)}
+.tag.pdf{background:transparent;border:1px solid var(--accent-line);color:var(--accent);line-height:20px}
+.tag.new{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.tag.stop{margin-left:6px;vertical-align:1px}
+.live{color:var(--accent);font-weight:700}
+
+/* ---------- ボタンとチップ ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 16px;border:1px solid var(--line2);border-radius:10px;background:var(--raise2);color:var(--text);font-size:14px;line-height:1.3;text-align:center;text-decoration:none}
+.btn.pdf,.btn.pri{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;margin:6px calc(var(--gutter) * -1) 4px;padding:0 var(--gutter) 6px;scrollbar-width:none}
+.chips.scroll::-webkit-scrollbar{display:none}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;border:1px solid var(--line2);border-radius:22px;background:transparent;color:var(--text);font-size:14px;text-decoration:none;white-space:nowrap}
+.chip .n{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"],.chip[aria-current="true"]{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent)}
+.none{margin:28px 0;padding:20px;border:1px dashed var(--line2);border-radius:12px;color:var(--muted);font-size:15px}
+.none .btn{margin:12px 8px 0 0}
+
+/* ---------- ホーム ---------- */
+.hscroll{display:flex;gap:12px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;margin:0 calc(var(--gutter) * -1);padding:4px var(--gutter) 12px;scroll-padding:0 var(--gutter)}
+.pin{position:relative;flex:0 0 min(78vw,300px);scroll-snap-align:start;display:flex;flex-direction:column;gap:6px;min-height:178px;padding:16px;border:1px solid var(--line2);border-radius:14px;background:var(--raise);color:inherit;box-shadow:var(--shadow)}
+.pin-main{display:flex;flex-direction:column;gap:6px;flex:1;color:inherit;text-decoration:none}
+.pin-main::after{content:"";position:absolute;inset:0;border-radius:14px}
+.pin .acts{position:relative;z-index:1;margin-top:4px}
+.pin .pn{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pin .nm{font-size:19px;font-weight:700;line-height:1.4}
+.pin .ps{color:var(--muted);font-size:13px;line-height:1.5}
+.pin .pl{display:block;font-size:14px;line-height:1.6}
+.pin .pl b{display:block;color:var(--faint);font-size:12px;font-weight:500}
+.pin .pf{margin-top:auto;color:var(--faint);font-size:13px}
+.pin.add{flex-basis:190px;align-items:center;justify-content:center;gap:6px;border-style:dashed;background:transparent;box-shadow:none;color:var(--muted);text-align:center;font-size:14px;text-decoration:none}
+.pin.add svg{width:26px;height:26px}
+.newbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin-top:14px;padding:10px 12px 10px 16px;border:1px solid var(--accent-line);border-radius:12px;background:var(--accent-soft);font-size:15px}
+.newbar b{color:var(--accent)}
+.newbar .btns{display:flex;gap:8px}
+.home-cols{display:grid;grid-template-columns:minmax(0,1fr);gap:0 36px}
+.tiles{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.tile{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-height:76px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--raise);color:inherit;text-decoration:none}
+.tile .nm{display:block;font-size:16px;font-weight:700;line-height:1.45}
+.tile .ds{display:block;color:var(--muted);font-size:13px;line-height:1.5}
+.tile .up{display:block;margin-top:4px;color:var(--faint);font-size:13px;line-height:1.5}
+.tile .up b{color:var(--muted);font-weight:500}
+.tile svg{width:18px;height:18px;margin-top:4px;color:var(--faint)}
+.tile.stopped .nm{color:var(--muted)}
+.linkrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;margin-top:10px;padding:8px 16px;border:1px solid var(--line);border-radius:12px;color:inherit;text-decoration:none;font-size:15px}
+.linkrow span:last-child{color:var(--accent);font-size:14px}
+.news{border-top:1px solid var(--line)}
+.news-item{display:grid;grid-template-columns:48px minmax(0,1fr);gap:0 8px;min-height:56px;padding:10px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none}
+.news-item time{padding-top:1px;color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+.news-item .nt{font-size:15px;line-height:1.55}
+.news-item .nc{display:block;margin-top:2px;color:var(--faint);font-size:12px}
+
+/* ---------- 人物の一覧 ---------- */
+.grp{display:flex;align-items:baseline;gap:8px;margin:22px 0 2px;font-size:15px;color:var(--muted)}
+.grp span{color:var(--faint);font-size:13px;font-weight:400}
+.plist{border-top:1px solid var(--line)}
+.prow{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+.prow-link{flex:1;min-width:0;display:block;min-height:68px;padding:12px 0;color:inherit;text-decoration:none}
+.pr-top{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}
+.pr-name{font-size:17px;font-weight:700;line-height:1.4}
+.pr-sub{display:block;color:var(--muted);font-size:13px;line-height:1.5}
+.pr-meta{display:block;margin-top:2px;color:var(--faint);font-size:13px}
+.pinbtn{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:84px;min-height:44px;padding:0 10px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--faint);font-size:13px}
+.pinbtn svg{width:18px;height:18px}
+.pinbtn[aria-pressed="true"]{color:var(--accent)}
+.pinbtn[aria-pressed="true"] svg{fill:var(--accent-soft)}
+
+/* ---------- 資料の並び（資料タブ・検索・年表で共通） ---------- */
+.month{display:flex;align-items:baseline;gap:8px;margin:24px 0 4px;color:var(--muted);font-size:15px}
+.month span{color:var(--faint);font-size:13px;font-weight:400}
+.doclist{border-top:1px solid var(--line)}
+.item{padding:4px 0 12px;border-bottom:1px solid var(--line)}
+.item-main{display:grid;grid-template-columns:minmax(0,1fr) 20px;gap:0 8px;align-items:center;min-height:56px;padding:10px 0 2px;color:inherit;text-decoration:none}
+.item-main .chev{width:20px;height:20px;color:var(--faint)}
+.chev svg{width:20px;height:20px}
+.dmeta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:4px}
+.dmeta time{margin-right:4px;color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+.dt{display:block;font-size:16px;font-weight:700;line-height:1.55}
+.sum{display:block;margin-top:4px;color:var(--muted);font-size:14px;line-height:1.65}
+.sum.clamp2{display:-webkit-box}
+.who{display:block;margin-top:4px;color:var(--faint);font-size:13px}
+.acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+.acts:empty{display:none}
+.dsearch{position:relative;margin-top:14px}
+.dsearch input{display:block;width:100%;height:48px;padding:0 48px 0 14px;border:1px solid var(--line2);border-radius:12px;background:var(--raise);color:var(--text);font-family:inherit;font-size:16px;-webkit-appearance:none;appearance:none}
+.dsearch input::-webkit-search-cancel-button{display:none}
+.dsearch input::placeholder{color:var(--faint)}
+.dsearch .clr{position:absolute;right:2px;top:2px;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:var(--muted)}
+.dsearch .clr svg{width:20px;height:20px}
+.check{display:flex;align-items:center;gap:10px;min-height:44px;color:var(--muted);font-size:14px}
+.check input{width:20px;height:20px;margin:0;accent-color:var(--accent)}
+.morebtn{display:flex;width:100%;justify-content:center;margin-top:18px}
+
+/* ---------- 人物ページ ---------- */
+.phead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.phead h1{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.pmeta{margin-top:8px;color:var(--muted);font-size:14px}
+.pdfrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 40px;margin-top:16px}
+.panel{padding:16px 18px;border:1px solid var(--line2);border-radius:14px;background:var(--raise)}
+.concl .lab{margin-bottom:8px;color:var(--accent);font-size:13px;letter-spacing:.06em}
+.concl p{font-size:17px;line-height:1.7;font-weight:700}
+.concl.cl p + p{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.concl .lt{font-size:16px}
+.concl .ld{margin-top:4px;color:var(--muted);font-size:14px;font-weight:400}
+.concl .src{display:flex;align-items:center;min-height:44px;margin-top:8px;color:var(--accent);font-size:14px;font-weight:400;text-decoration:none}
+.alias{margin-top:20px;color:var(--faint);font-size:13px;line-height:1.7}
+.alias b{display:block;color:var(--muted);font-weight:500}
+.tl{margin-top:4px;border-left:2px solid var(--line)}
+.tl-mon{padding:18px 0 4px 14px}
+.tl-mon h3{color:var(--muted);font-size:15px;font-weight:700}
+.tl-item{display:grid;grid-template-columns:54px minmax(0,1fr);gap:0 6px;padding:8px 0 4px 14px;border-bottom:1px solid var(--line)}
+.tl-item .item{padding:0;border:0}
+.tl-item .item-main{padding-top:6px}
+.tl-date{padding-top:12px;color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+
+/* ---------- ツールとサイト ---------- */
+.grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:6px}
+.card{padding:16px 18px;border:1px solid var(--line2);border-radius:14px;background:var(--raise)}
+.card.flash{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.card h3{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:16px;line-height:1.5}
+.card .kind{color:var(--faint);font-size:12px;font-weight:400}
+.card .what{margin-top:8px;color:var(--muted);font-size:14px;line-height:1.7}
+.card .kv{display:grid;gap:4px;margin-top:10px;color:var(--faint);font-size:13px}
+.card .kv b{margin-right:8px;color:var(--muted);font-weight:500}
+.card .nbox{margin-top:10px;padding:8px 12px;border-left:2px solid var(--accent);border-radius:0 8px 8px 0;background:var(--accent-soft);color:var(--text);font-size:13px;line-height:1.65}
+.card .acts{margin-top:12px}
+.badge{display:inline-block;padding:0 9px;border:1px solid var(--line2);border-radius:999px;color:var(--muted);font-size:12px;font-weight:700;line-height:20px}
+.b-live,.b-on{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent)}
+.b-active{color:var(--text);border-color:var(--accent-line)}
+.b-quiet{color:var(--muted)}
+.b-dormant,.b-empty,.b-off{color:var(--faint)}
+.b-lock{color:#d99a8c;border-color:rgba(217,154,140,.45)}
+.card .kv a{color:var(--accent)}
+.warnbox{margin-top:10px;padding:8px 12px;border-left:2px solid #d99a8c;border-radius:0 8px 8px 0;background:rgba(217,154,140,.08);color:var(--text);font-size:13px;line-height:1.65}
+
+/* ---------- 全画面の検索 ---------- */
+.search{position:fixed;left:0;top:0;width:100%;height:100vh;height:100dvh;z-index:50;display:flex;flex-direction:column;background:var(--bg)}
+.s-bar{border-bottom:1px solid var(--line);padding:10px var(--gutter)}
+.s-bar-in{display:flex;align-items:center;gap:8px;width:100%;max-width:720px;margin:0 auto}
+.s-field{position:relative;flex:1;min-width:0}
+.s-field input{display:block;width:100%;height:48px;padding:0 48px 0 14px;border:1px solid var(--line2);border-radius:12px;background:var(--raise);color:var(--text);font-family:inherit;font-size:17px;-webkit-appearance:none;appearance:none}
+.s-field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.s-field input::-webkit-search-cancel-button{display:none}
+.s-field input::placeholder{color:var(--faint)}
+.s-clr{position:absolute;right:2px;top:2px;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:var(--muted)}
+.s-clr svg{width:20px;height:20px}
+.s-close{flex:none;min-height:44px;padding:0 6px 0 10px;border:0;background:transparent;color:var(--accent);font-size:15px}
+.s-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:6px var(--gutter) 48px}
+.s-inner{max-width:720px;margin:0 auto}
+.s-sum{margin:14px 0 0;color:var(--muted);font-size:14px}
+.rg{display:flex;align-items:baseline;gap:8px;margin:22px 0 6px;font-size:15px;color:var(--muted)}
+.rg span{color:var(--faint);font-size:13px;font-weight:400}
+.sug{margin-top:12px;border:1px solid var(--line2);border-radius:16px;background:var(--raise);box-shadow:var(--shadow);overflow:hidden}
+.sug .g + .g{border-top:1px solid var(--line)}
+.sug .g-h{display:flex;justify-content:space-between;gap:12px;padding:14px 16px 4px;color:var(--muted);font-size:13px;font-weight:700;letter-spacing:.04em}
+.sug .g-h span:last-child{color:var(--faint);font-weight:400}
+.opt{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 16px;color:var(--text);text-decoration:none}
+.opt.act{background:var(--raise2);box-shadow:inset 3px 0 0 var(--accent)}
+.opt .o-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.opt .o-title{font-weight:600;line-height:1.5}
+.opt .o-sub{color:var(--muted);font-size:13px}
+.opt .o-why{margin-left:8px;color:var(--accent);font-size:13px;font-weight:400}
+.opt .o-end{flex:none;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+.opt.all{border-top:1px solid var(--line);color:var(--accent);font-weight:700}
+.sug .hint{padding:8px 16px 12px;color:var(--faint);font-size:12px}
+.rp{display:block;min-height:76px;margin-bottom:10px;padding:14px 16px;border:1px solid var(--line2);border-radius:12px;background:var(--raise);color:inherit;text-decoration:none}
+.rp.top1{border-color:var(--accent-line);background:var(--accent-soft)}
+.rp .pr-name{font-size:18px}
+.rp .why{display:block;margin-top:4px;color:var(--accent);font-size:13px}
+.s-intro p{color:var(--muted);font-size:14px;line-height:1.7}
+.s-intro h2{margin:20px 0 4px;font-size:15px;color:var(--muted)}
+
+/* ---------- 読み手（資料を読む全画面） ---------- */
+#reader{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column}
+#reader .rhead{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-height:56px;padding:6px var(--gutter);padding-top:calc(6px + env(safe-area-inset-top));border-bottom:1px solid var(--line);background:var(--raise)}
+#reader .rhead button{flex:none;min-height:44px;padding:0 14px;border:1px solid var(--line2);border-radius:10px;background:var(--raise2);font-size:14px}
+#reader .rhead .rt{flex:1;min-width:0;font-size:14px;font-weight:700;line-height:1.5;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* タップで全文表示（1行省略だと日付つきの長いタイトルが判別できない） */
+#reader .rhead .rt.open{white-space:normal;overflow:visible;text-overflow:clip}
+#reader .rbody{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+#reader .rinner{max-width:860px;margin:0 auto;padding:22px 18px 80px}
+#reader iframe{width:100%;height:100%;border:0;background:#fff}
+/* 注意書きと埋め込みを縦に積む。iframe の height:100% だけだと注意書きの分だけはみ出す。 */
+#reader .rstack{display:flex;flex-direction:column;height:100%}
+#reader .rstack iframe{flex:1;height:auto;min-height:240px}
+.rwarn{margin:12px 12px 0;padding:12px 14px;border:1px solid var(--accent-line);border-radius:10px;background:var(--accent-soft);color:var(--text);font-size:13px;line-height:1.65}
+.rwarn b{display:block;margin-bottom:6px;font-size:14px}
+.rwarn p{margin:6px 0}
+.rwarn .btn{margin-top:4px}
+.rmeta{display:grid;gap:4px;margin-bottom:22px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--raise);color:var(--muted);font-size:13px}
+.rmeta b{margin-right:6px;color:var(--faint);font-weight:500}
+.rmeta .acts{margin-top:6px}
+.rmiss{padding:22px 20px;border:1px dashed var(--line2);border-radius:12px;color:var(--muted);font-size:15px}
+.rmiss p + p{margin-top:8px}
+.rmiss .acts{margin-top:14px}
+
+/* 本文タイポグラフィ */
+.prose{overflow-wrap:break-word}
+.prose h1{margin:0 0 18px;padding-bottom:12px;border-bottom:2px solid var(--accent);font-size:22px;line-height:1.45}
+.prose h2{margin:32px 0 12px;padding-left:10px;border-left:3px solid var(--accent);font-size:18px}
+.prose h3{margin:24px 0 10px;color:var(--accent);font-size:15.5px}
+.prose h4{margin:18px 0 8px;color:var(--muted);font-size:14px}
+.prose p{margin:0 0 14px}
+.prose ul,.prose ol{margin:0 0 14px;padding-left:24px}
+.prose ul{list-style:disc}
+.prose ol{list-style:decimal}
+.prose li{margin-bottom:6px}
+.prose blockquote{margin:0 0 16px;padding:10px 14px;border-left:3px solid var(--faint);border-radius:0 8px 8px 0;background:var(--raise);color:var(--muted);font-size:14px}
+.prose blockquote p:last-child{margin-bottom:0}
+.prose code{padding:2px 6px;border-radius:5px;background:var(--raise2);color:var(--accent);font-family:ui-monospace,"Consolas",monospace;font-size:.87em;overflow-wrap:anywhere}
+.prose pre{margin:0 0 16px;padding:13px;border:1px solid var(--line);border-radius:8px;background:var(--raise);overflow-x:auto}
+.prose pre code{padding:0;background:none;color:var(--muted);overflow-wrap:normal}
+.prose table{width:100%;margin:0 0 16px;border-collapse:collapse;font-size:13px}
+.prose .tablewrap{margin:0 0 16px;overflow-x:auto}
+.prose .tablewrap table{margin:0}
+.prose th,.prose td{padding:8px 11px;border:1px solid var(--line);text-align:left;vertical-align:top}
+.prose th{background:var(--raise2);font-weight:700;white-space:nowrap}
+.prose tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+.prose hr{margin:26px 0;border:0;border-top:1px solid var(--line)}
+.prose img{max-width:100%;height:auto;border-radius:8px}
+.prose a{color:var(--accent);word-break:break-all}
+.prose strong{color:#fff}
+
+/* ---------- 動き（状態の変化を伝えるものだけ） ---------- */
+@media (prefers-reduced-motion:no-preference){
+  .search.show{animation:sIn .16s ease-out}
+  @keyframes sIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .chip,.btn,.tile,.pin,.pinbtn,.rp,.linkrow,.opt{transition:border-color .12s,background-color .12s,color .12s}
+}
+@media (hover:hover){
+  .tile:hover,.pin:hover,.linkrow:hover,.rp:hover{border-color:var(--accent-line)}
+  .chip:hover,.btn:hover{border-color:var(--accent-line)}
+  .prow-link:hover .pr-name,.news-item:hover .nt,.item-main:hover .dt{color:var(--accent)}
+  .opt:hover{background:var(--raise2)}
+}
+
+/* ---------- 小さい画面 ---------- */
+@media (max-width:359px){
+  .tabs a{font-size:11px}
+  .pin{flex-basis:84vw}
+}
+@media (max-width:600px){
+  /* スマホでは Windows のファイルパスを使う場面が無い */
+  #rcopy{display:none}
+}
+
+/* ---------- 広めの画面 ---------- */
+@media (min-width:640px){
+  .tiles.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tiles.two > :last-child:nth-child(odd){grid-column:1 / -1}
+  .grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (min-width:900px){
+  :root{--gutter:32px}
+  body{padding-left:232px}
+  .tabs{top:0;right:auto;width:232px;flex-direction:column;justify-content:flex-start;gap:4px;padding:22px 12px;border-top:0;border-right:1px solid var(--line)}
+  .tabs .brand-d{display:block;margin:0 8px 18px;font-size:17px;font-weight:700;line-height:1.4}
+  .tabs .brand-d small{display:block;margin-top:2px;color:var(--faint);font-size:12px;font-weight:400}
+  .tabs a{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;min-height:48px;padding:0 14px;border-radius:10px;font-size:15px}
+  .tabs a[aria-current="page"]{background:var(--accent-soft);box-shadow:none}
+  .page{padding-top:28px;padding-bottom:64px}
+  .brand-m{display:none}
+  .top{justify-content:flex-end}
+  .top #topLeft{margin-right:auto}
+  .search-btn{min-width:400px;padding:0 18px 0 14px;border-radius:12px}
+  .search-btn .lbl{display:none}
+  .search-btn .hint{display:inline}
+  .home-cols{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
+  .pin{flex-basis:300px}
+  .pgrid{grid-template-columns:minmax(0,5fr) minmax(0,6fr);align-items:start}
+  .pgrid > aside{position:sticky;top:76px}
+  .pgrid > section > .sec-head{margin-top:0}
+  .chips.scroll{flex-wrap:wrap;overflow:visible;margin:6px 0 4px;padding:0}
+  .hscroll{margin:0;padding-left:0;padding-right:0}
+  .s-bar,.s-body{padding-left:32px;padding-right:32px}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="l">資産カタログを読み込んでいます…<div class="bar"><i></i></div></div>
+</div>
+
+<div id="gate" hidden>
+  <form class="box" id="gateform" autocomplete="on">
+    <h1>VTuber<span style="color:var(--accent)">資産ポータル</span></h1>
+    <p>社内限定。閲覧パスワードを入力してください。</p>
+    <div class="pwwrap">
+      <!-- inputmode は指定しない。numeric にすると iOS で数字キーパッドが出て英字を打てなくなる。 -->
+      <input id="pw" name="password" type="password" autocomplete="current-password"
+             enterkeyhint="go" spellcheck="false" autocapitalize="off" autocorrect="off"
+             placeholder="パスワード">
+      <button type="button" class="eye" id="pwtoggle" aria-label="パスワードを表示">👁</button>
+    </div>
+    <button type="submit" id="unlock">解錠</button>
+    <div class="msg" id="gatemsg"></div>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div id="topLeft"></div>
+    <button class="search-btn" id="openSearch" type="button" data-act="opensearch" aria-label="さがす。名前、あだ名、資料の題名で探せます"><span id="icoSearch"></span><span class="lbl">さがす</span><span class="hint">名前・あだ名・資料の題名でさがす</span></button>
+  </header>
+  <main id="main" class="page" tabindex="-1"></main>
+  <nav class="tabs" id="tabs" aria-label="主な画面"></nav>
+</div>
+
+<div class="search" id="search" role="dialog" aria-modal="true" aria-label="さがす" hidden>
+  <div class="s-bar"><div class="s-bar-in">
+    <div class="s-field">
+      <label class="sr" for="sq">名前、あだ名、資料の題名、ツール名、サイト名</label>
+      <input id="sq" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="名前・あだ名・題名でさがす">
+      <button class="s-clr" id="sclr" type="button" data-act="sclear" aria-label="入力を消す" hidden></button>
+    </div>
+    <button class="s-close" id="sclose" type="button" data-act="back" data-fb="#/">閉じる</button>
+  </div></div>
+  <div class="s-body" id="sbody"><div class="s-inner" id="sres" aria-live="polite"></div></div>
+</div>
+
+<div id="reader" role="dialog" aria-modal="true" aria-label="資料を読む" hidden>
+  <div class="rhead">
+    <button id="rback" type="button" data-act="back" data-fb="#/docs">← 戻る</button>
+    <div class="rt" id="rtitle" title="タップで全文表示"></div>
+    <button id="rfull" type="button" hidden title="別タブで原寸表示">全画面 ↗</button>
+    <button id="rcopy" type="button" hidden title="ファイルパスをコピー">パスをコピー</button>
+  </div>
+  <div class="rbody" id="rbody"></div>
+</div>
+
+<script>
+"use strict";
+const MODE = "publish";           // "local" | "encrypted"
+let DATA = null;
+
+/* ============ 復号（build 側 crypto.py と対。片方を変えたら両方揃えること） ============ */
+function b64d(s){const b=atob(s);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
+async function deriveKey(pw, salt, iter){
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), {name:"PBKDF2"}, false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:iter, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+}
+async function gunzip(buf){
+  // パスワード誤りと端末非対応は原因が違う。catch 側で見分けられるよう印を付ける。
+  if (typeof DecompressionStream === "undefined"){
+    const e = new Error("この端末は gzip 展開に対応していません"); e.code = "NOGZIP"; throw e;
+  }
+  const ds = new DecompressionStream("gzip");
+  const stream = new Blob([buf]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function decryptWithKey(enc, key){
+  let pt = new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM", iv:b64d(enc.iv)}, key, b64d(enc.ciphertext)));
+  if (enc.compress === "gzip") pt = await gunzip(pt);
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+/* 導出済み鍵のキャッシュ（katana / skeb と同じ設計＝**平文パスワードは持たない**）。
+   CryptoKey は extractable:false で作るので、IndexedDB に入っても値を取り出せない。
+   PBKDF2 60万反復はスマホで約1秒かかるため、2回目以降はこれを飛ばして即解錠する。 */
+function _keyId(enc){ return "k:" + (enc.salt || "") + ":" + (enc.iterations || 0); }
+function _idb(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("vtuber-portal-keys", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("keys");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function _idbGet(id){
+  try{
+    const db = await _idb();
+    return await new Promise(res => {
+      const q = db.transaction("keys", "readonly").objectStore("keys").get(id);
+      q.onsuccess = () => res(q.result || null);
+      q.onerror = () => res(null);
+    });
+  }catch(e){ return null; }          // プライベートウィンドウ等では使えない。素通りさせる
+}
+async function _idbPut(id, key){
+  try{
+    const db = await _idb();
+    db.transaction("keys", "readwrite").objectStore("keys").put(key, id);
+  }catch(e){}
+}
+
+/* ============ 起動 ============ */
+
+/** 読み込み・描画に失敗したときの最終画面。
+    standalone（ホーム画面から起動）だとリロード UI が無いので再試行手段を必ず残す。
+    **原因を必ず出す**こと: 黙って空の画面になると「データが全部消えた」としか見えず、
+    サーバ側の障害と端末側の障害を切り分けられない（2026-09-04 の調査で判明）。 */
+function fatal(e){
+  const line = e && e.stack ? String(e.stack).split("\n").slice(0,2).join(" / ") : "";
+  const detail = (e && e.message ? e.message : String(e)) + (line ? "  [" + line + "]" : "");
+  document.body.innerHTML = `<div class="empty" style="padding-top:80px">
+    読み込みに失敗しました<br><span class="path">${esc(detail)}</span>
+    <div class="acts" style="display:flex; justify-content:center; gap:10px; margin-top:20px">
+      <button class="primary" id="retry" style="padding:10px 18px; border-radius:9px; border:0; background:#7c5cff; color:#fff; font-weight:700">再読み込み</button>
+      <button id="hardreset" style="padding:10px 18px; border-radius:9px">保存データを消して再試行</button>
+    </div></div>`;
+  const r = document.getElementById("retry");
+  if(r) r.onclick = () => location.reload();
+  // 端末に残った鍵・既読状態が壊れている場合の自力復旧（パスワードの再入力が必要になる）。
+  const h = document.getElementById("hardreset");
+  if(h) h.onclick = async () => {
+    try{ localStorage.removeItem(LS_SEEN); }catch(err){}
+    try{ indexedDB.deleteDatabase("vtuber-portal-keys"); }catch(err){}
+    setTimeout(() => location.reload(), 300);
+  };
+}
+
+async function boot(){
+  const res = await fetch("data.json", {cache:"no-cache"});
+  if(!res.ok) throw new Error("data.json を取得できません ("+res.status+")");
+  const raw = await res.json();
+  if (MODE === "local" || !raw.ciphertext){ DATA = raw; render(); return; }
+
+  // 1) 前回の導出済み鍵があれば PBKDF2（スマホで約1秒）を飛ばして即解錠
+  // 復号と描画を**別の try に分ける**。同じ try に入れると描画の失敗まで「鍵が古い」と
+  // 誤判定してゲートへ落ち、正しいパスワードでも「パスワードが違います」になる。
+  const cached = await _idbGet(_keyId(raw));
+  if (cached){
+    let payload = null;
+    try{ payload = await decryptWithKey(raw, cached); }
+    catch(e){ /* パスワード変更後などは失敗する。ゲートへ落とす */ }
+    if (payload){ DATA = payload; render(); return; }   // 描画の失敗は boot().catch → fatal() へ
+  }
+
+  const gate = document.getElementById("gate");
+  document.getElementById("loading").hidden = true;
+  gate.hidden = false;
+  const pwEl = document.getElementById("pw"), msg = document.getElementById("gatemsg");
+  const btn = document.getElementById("unlock");
+  const tryUnlock = async (pw) => {
+    if(!pw || btn.disabled) return;
+    btn.disabled = true;                       // PBKDF2 の1秒間に連打すると鍵導出が多重に走る
+    msg.textContent = "解錠中…（初回は数秒かかります）";
+    let payload = null;
+    try{
+      const key = await deriveKey(pw, b64d(raw.salt), raw.iterations);
+      payload = await decryptWithKey(raw, key);
+      await _idbPut(_keyId(raw), key);   // 保存するのは鍵だけ。パスワードは残さない
+    }catch(e){
+      msg.textContent = e && e.code === "NOGZIP"
+        ? "この端末は表示に必要な機能（gzip 展開）に未対応です。別のブラウザでお試しください"
+        : "パスワードが違います";
+      return;
+    }finally{
+      btn.disabled = false;
+    }
+    // 復号は成功。ここから先の失敗は「パスワードが違う」ではないので、
+    // ゲートに嘘を出さず fatal() で原因ごと見せる（黙って空画面にしない）。
+    try{
+      DATA = payload;
+      gate.hidden = true;
+      render();
+    }catch(e){
+      fatal(e);
+    }
+  };
+  msg.textContent = "";
+  // form の submit に集約すると、キーボードの「go」でもボタンでも同じ経路になる
+  document.getElementById("gateform").onsubmit = e => { e.preventDefault(); tryUnlock(pwEl.value.trim()); };
+  document.getElementById("pwtoggle").onclick = () => {
+    const show = pwEl.type === "password";
+    pwEl.type = show ? "text" : "password";
+    const t = document.getElementById("pwtoggle");
+    t.textContent = show ? "🙈" : "👁";
+    t.setAttribute("aria-label", show ? "パスワードを隠す" : "パスワードを表示");
+    pwEl.focus();
+  };
+  pwEl.focus();
+}
+
+/* ============ 描画 ============ */
+const $ = id => document.getElementById(id);
+const qs = (s, r) => (r || document).querySelector(s);
+const qsa = (s, r) => Array.from((r || document).querySelectorAll(s));
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const enc = encodeURIComponent;
+const dec = s => { try{ return decodeURIComponent(s); }catch(e){ return s; } };
+/** 外へ出るリンクは http(s) だけ許す（データ由来の文字列を href に入れるため）。 */
+const safeUrl = u => (typeof u === "string" && /^https?:\/\//i.test(u)) ? u : null;
+let NEW_IDS = new Set();          // 前回訪問以降に増えた文書
+const LS_SEEN = "vp:seen";
+const LS_PINS = "vp:pins";
+
+/* ---------- ことば合わせ（全角半角・ひらがな/カタカナ・大小文字・空白を同一視） ---------- */
+function foldKana(s){
+  return s.replace(/[ぁ-ゖ]+/g, run => {
+    let o = "";
+    for(let i = 0; i < run.length; i++) o += String.fromCharCode(run.charCodeAt(i) + 0x60);
+    return o;
+  });
+}
+function norm(s){
+  return foldKana(String(s == null ? "" : s).normalize("NFKC").toLowerCase()).replace(/\s+/g, "");
+}
+function terms(q){
+  return String(q == null ? "" : q).normalize("NFKC").split(/\s+/).map(norm).filter(Boolean);
+}
+/** 1 文字ずつ正規化し、正規化後の位置から元の文字列の位置へ戻せる表を作る（一致箇所の強調用）。 */
+function foldMap(s){
+  let f = ""; const ms = [], me = []; let i = 0;
+  for(const ch of String(s == null ? "" : s)){
+    const len = ch.length, n = ch.normalize("NFKC").toLowerCase();
+    for(const c of n){
+      if(/\s/.test(c)) continue;
+      const cp = c.codePointAt(0);
+      const o = (cp >= 0x3041 && cp <= 0x3096) ? String.fromCodePoint(cp + 0x60) : c;
+      for(let k = 0; k < o.length; k++){ f += o[k]; ms.push(i); me.push(i + len); }
+    }
+    i += len;
+  }
+  return {f, ms, me};
+}
+function hl(text, ts){
+  const s = String(text == null ? "" : text);
+  if(!ts || !ts.length) return esc(s);
+  const m = foldMap(s), r = [];
+  ts.forEach(t => {
+    if(!t) return;
+    let from = 0, ix;
+    while((ix = m.f.indexOf(t, from)) >= 0){ r.push([m.ms[ix], m.me[ix + t.length - 1]]); from = ix + t.length; }
+  });
+  if(!r.length) return esc(s);
+  r.sort((a, b) => a[0] - b[0]);
+  const merged = [r[0].slice()];
+  for(let j = 1; j < r.length; j++){
+    const l = merged[merged.length - 1];
+    if(r[j][0] <= l[1]) l[1] = Math.max(l[1], r[j][1]); else merged.push(r[j].slice());
+  }
+  let out = "", pos = 0;
+  merged.forEach(x => { out += esc(s.slice(pos, x[0])) + "<mark>" + esc(s.slice(x[0], x[1])) + "</mark>"; pos = x[1]; });
+  return out + esc(s.slice(pos));
+}
+
+/* ---------- 日付 ---------- */
+const pad2 = n => String(n).padStart(2, "0");
+const YEAR = String(new Date().getFullYear());
+/** N 日前の日付（YYYY-MM-DD）。docs の date と文字列比較する。 */
+function cutoff(days){
+  const d = new Date(); d.setDate(d.getDate() - days);
+  return d.getFullYear() + "-" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate());
+}
+function ymd(d){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ""); return m ? {y:+m[1], m:+m[2], d:+m[3]} : null; }
+function dateJa(d){ const x = ymd(d); return x ? (String(x.y) === YEAR ? "" : x.y + "年") + x.m + "月" + x.d + "日" : (d || ""); }
+function dateLong(d){ const x = ymd(d); return x ? x.y + "年" + x.m + "月" + x.d + "日" : (d || ""); }
+function dateShort(d){ const x = ymd(d); return x ? x.m + "/" + x.d : (d || ""); }
+function monthJa(d){ const x = ymd(d); return x ? x.y + "年" + x.m + "月" : ""; }
+
+/* ---------- 絵（外部ファイルは使わず、ここに直接書く） ---------- */
+const svg = d => '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + d + '</svg>';
+const I = {
+  home: svg('<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V10"/>'),
+  people: svg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.2c2.4.4 4 2.3 4 5.3"/>'),
+  docs: svg('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h6M10 17h6"/>'),
+  tools: svg('<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M3 13.5h18"/>'),
+  search: svg('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>'),
+  ext: svg('<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
+  back: svg('<path d="m15 5-7 7 7 7"/>'),
+  chev: svg('<path d="m9 5 7 7-7 7"/>'),
+  pin: svg('<path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/>'),
+  x: svg('<path d="m6 6 12 12M18 6 6 18"/>'),
+  plus: svg('<path d="M12 5v14M5 12h14"/>')
+};
+
+/* ---------- データの下ごしらえ ---------- */
+let DOCS = [], BYID = {}, PEOPLE = [], PBYID = {}, DOC_PEOPLE = {};
+let ROLE_KEYS = [], PROJ = [], PROJ_BY_ID = {}, SITES = [], SHEETS = [], CATS = [], CAT_LABEL = {};
+const newest = (a, b) => String(b.date).localeCompare(String(a.date)) || String(a.title).localeCompare(String(b.title), "ja");
+const PSTATUS_ORDER = ["live","active","quiet","dormant","empty"];
+
+function roleLabel(k){ return ((DATA.roles || {})[k]) || k || "その他"; }
+
+function prepare(){
+  DOCS = (DATA.docs || []).slice();
+  BYID = {};
+  DOCS.forEach(d => {
+    BYID[d.id] = d;
+    d._t = norm(d.title);
+    // 打鍵ごとの再計算をしないための軽い索引（題名・要約・分類・パス）。本文は別（必要な時だけ）。
+    d._h = norm([d.title, d.summary, d.category_label, d.rel].join(" "));
+    CAT_LABEL[d.category] = CAT_LABEL[d.category] || d.category_label;
+  });
+  DOCS.sort(newest);
+
+  PEOPLE = DATA.people || [];
+  PBYID = {}; DOC_PEOPLE = {};
+  PEOPLE.forEach(p => {
+    PBYID[p.id] = p;
+    p.aliases = p.aliases || [];
+    p._docs = (p.doc_ids || []).map(id => BYID[id]).filter(Boolean);   // doc_ids は新しい順
+    p._pdf = p._docs.find(d => safeUrl(d.pdf)) || null;
+    p._n = {name: norm(p.name), aliases: p.aliases.map(norm), sub: norm(p.sub), role: norm(roleLabel(p.role))};
+    p._docs.forEach(d => (DOC_PEOPLE[d.id] ||= []).push(p.id));
+  });
+  ROLE_KEYS = Object.keys(DATA.roles || {}).filter(k => PEOPLE.some(p => p.role === k));
+  PEOPLE.forEach(p => { if(ROLE_KEYS.indexOf(p.role) < 0) ROLE_KEYS.push(p.role); });
+
+  // 状態の順（自動で動いている → 最近更新 → …）、同じ状態の中は最終更新の新しい順
+  PROJ = (DATA.projects || []).map((p, i) => ({p, i}))
+    .sort((a, b) => (PSTATUS_ORDER.indexOf(a.p.status) + 1 || 99) - (PSTATUS_ORDER.indexOf(b.p.status) + 1 || 99)
+      || String(b.p.last_change || "").localeCompare(String(a.p.last_change || "")) || a.i - b.i)
+    .map(x => x.p);
+  PROJ_BY_ID = {};
+  // 名前（README の見出し）とフォルダ名のどちらでも探せるように
+  PROJ.forEach(p => { PROJ_BY_ID[p.id] = p; p._t = norm(p.name + " " + (p.folder || "")); });
+  SITES = DATA.sites || [];
+  SITES.forEach(s => { s._t = norm(s.name); });
+  SHEETS = (DATA.sheets || []).slice();
+  SHEETS.forEach(s => { s._t = norm(s.name); });
+
+  const present = {};
+  DOCS.forEach(d => { present[d.category] = true; });
+  CATS = (DATA.categories || []).map(c => c.id).filter(id => present[id]);
+  Object.keys(present).forEach(id => { if(CATS.indexOf(id) < 0) CATS.push(id); });
+}
+
+/* ---------- ピン留め（この端末にだけ覚える。使えなければ画面を閉じるまで） ---------- */
+let memPins = null;
+function getPins(){
+  if(memPins) return memPins;
+  let v = null;
+  try{ v = JSON.parse(localStorage.getItem(LS_PINS) || "null"); }catch(e){}
+  if(!Array.isArray(v)) v = PEOPLE.filter(p => p.pinned).map(p => p.id);
+  memPins = v.filter(id => PBYID[id]);
+  return memPins;
+}
+function togglePin(id){
+  const a = getPins().slice(), i = a.indexOf(id);
+  if(i >= 0) a.splice(i, 1); else a.push(id);
+  memPins = a;
+  try{ localStorage.setItem(LS_PINS, JSON.stringify(a)); }catch(e){}
+}
+
+/** 前回訪問との差分を出す。週次で勝手に増える設計なので「何が増えたか」を出せないと気づけない。
+    generated_at が変わるまでは計算済みの差分を保つ（リロードで NEW が消えないように）。 */
+function computeNew(){
+  const cur = DATA.docs.map(d => d.id);
+  let seen = null;
+  try{ seen = JSON.parse(localStorage.getItem(LS_SEEN) || "null"); }catch(e){}
+  const save = o => { try{ localStorage.setItem(LS_SEEN, JSON.stringify(o)); }catch(e){} };
+  if(!seen || !Array.isArray(seen.ids)){
+    save({gen: DATA.generated_at, ids: cur, newIds: []});   // 初回は基準を作るだけ
+    return;
+  }
+  if(seen.gen === DATA.generated_at){
+    NEW_IDS = new Set(seen.newIds || []);
+    return;
+  }
+  const known = new Set(seen.ids);
+  const diff = cur.filter(id => !known.has(id));
+  NEW_IDS = new Set(diff);
+  save({gen: DATA.generated_at, ids: cur, newIds: diff});
+}
+function markAllSeen(){
+  NEW_IDS = new Set();
+  try{ localStorage.setItem(LS_SEEN, JSON.stringify({gen: DATA.generated_at, ids: DATA.docs.map(d => d.id), newIds: []})); }catch(e){}
+  dst.newOnly = false;
+  refresh();
+}
+
+/* ---------- ツール・サイトの共通部品（書庫のパスとプロジェクトの対応） ---------- */
+/** 状態は scan_tools.py が毎朝計算する（自動実行の有無と最終更新日）。手で書いた値ではない。 */
+const SLABEL = {live:"自動で動いている", active:"最近更新あり", quiet:"しばらく更新なし", dormant:"長く更新なし", empty:"空",
+                on:"有効", off:"無効"};
+/** プロジェクトの置き場に入っている書庫の文書。パス区切りが `\` と `/` で混在するので正規化して前方一致。 */
+const _np = s => String(s||"").replace(/\\/g, "/").toLowerCase();
+function projDocs(p){
+  if(!p || !p.path) return [];
+  const base = _np(p.path).replace(/\/+$/, "") + "/";
+  return DATA.docs.filter(d => _np(d.path).startsWith(base));
+}
+/** その文書を置いてあるプロジェクト（パス前方一致）。公開サイトへの導線に使う。 */
+function docProject(d){
+  return (DATA.projects || []).find(p =>
+    p.path && _np(d.path).startsWith(_np(p.path).replace(/\/+$/, "") + "/"));
+}
+/** `viewer.html` のように**同じフォルダの JSON を読み込む**成果物は、書庫にページ本体だけを
+    取り込んでも中身が空で表示される（隣のデータが無いため）。理由を出さずに空の画面だけ見せると
+    「データが全部消えた」としか読めないので、原因と代わりの導線を必ず添える（2026-09-04 の報告）。 */
+function dataWarning(d){
+  const need = d.needs_data || [];
+  if(!need.length) return null;
+  const p = docProject(d);
+  // 公開 URL が指すのはプロジェクトの**主成果物**だけ。同じフォルダの別ファイル（社内
+  // ダッシュボード等）は公開サイトに置かれていないので、押しても違うページに着く。
+  // 実測 2026-09-04: pages.dev は未知のパスにも 200 を返すため、404 で気づけない。
+  const live = p && p.url && p.main_doc && _np(d.rel).endsWith(_np(p.main_doc)) ? safeUrl(p.url) : "";
+  const shown = need.slice(0, 4).join(" / ") + (need.length > 4 ? ` ほか ${need.length - 4} 件` : "");
+  const el = document.createElement("div");
+  el.className = "rwarn";
+  el.innerHTML = `<b>⚠ この成果物は中身を別ファイルから読み込みます（書庫の中では一覧が空になります）</b>
+    <p>書庫に取り込んでいるのはページ本体だけです。読み込み先: <span class="path">${esc(shown)}</span></p>
+    ${live ? `<p><a class="btn pri" href="${esc(live)}" target="_blank" rel="noopener noreferrer">最新版を公開サイトで開く ↗</a></p>`
+           : `<p>このページは公開サイトには置かれていません。中身を見るには PC の元ファイルを開いてください。</p>`}
+    <p class="path">元ファイル: ${esc(d.rel)}</p>`;
+  return el;
+}
+
+/* ---------- 部品 ---------- */
+const countLine = p => (+p.count || 0) + "件" + (p.locked_count ? "（うち🔒" + (+p.locked_count || 0) + "件）" : "");
+const roleTag = k => '<span class="role' + (k === "talent" ? " talent" : "") + '">' + esc(roleLabel(k)) + '</span>';
+function extLink(href, cls, inner, aria){
+  return '<a class="' + cls + '" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer"' + (aria ? ' aria-label="' + esc(aria) + '"' : "") + '>' + inner + '</a>';
+}
+function docBtns(d, long){
+  const pdf = safeUrl(d.pdf), gh = safeUrl(d.github), out = [];
+  const suf = long ? "（要ログイン）" : "";
+  if(pdf) out.push(extLink(pdf, "btn pdf", "PDFを開く" + suf, "PDFを開く" + suf + "：" + d.title));
+  if(gh) out.push(extLink(gh, "btn", "GitHubで開く" + suf, "GitHubで開く" + suf + "：" + d.title));
+  return '<div class="acts">' + out.join("") + '</div>';
+}
+function docTags(d, o){
+  o = o || {};
+  const t = [];
+  if(NEW_IDS.has(d.id)) t.push('<span class="tag new">NEW</span>');
+  if(d.tier === 3) t.push('<span class="tag lock">🔒 鍵付き</span>');
+  if(safeUrl(d.pdf)) t.push('<span class="tag pdf">PDFあり</span>');
+  if(!d.body) t.push('<span class="tag">本文なし</span>');
+  if(o.bodyHit) t.push('<span class="tag">本文に一致</span>');
+  if(d.category_label && !o.nocat) t.push('<span class="tag">' + esc(d.category_label) + '</span>');
+  return t.join("");
+}
+/** 資料 1 件の行。題名を押すとサイトの中で読める（#/d/<id>）。PDF・GitHub は外へ出るボタンとして別に置く。 */
+function docRow(d, o){
+  o = o || {};
+  const sum = (d.summary && d.tier !== 3 && !o.compact) ? '<span class="sum clamp2">' + esc(d.summary) + '</span>' : "";
+  const who = (o.who && DOC_PEOPLE[d.id]) ? '<span class="who">人物: ' + DOC_PEOPLE[d.id].map(id => esc(PBYID[id].name)).join("、") + '</span>' : "";
+  const date = o.nodate ? "" : '<time datetime="' + esc(d.date) + '">' + esc(o.short ? dateShort(d.date) : dateJa(d.date)) + '</time>';
+  const title = o.hl ? hl(d.title, o.hl) : esc(d.title);
+  return '<article class="item"><a class="item-main" href="#/d/' + enc(d.id) + '"><span class="item-txt"><span class="dmeta">' + date + docTags(d, o) + '</span><span class="dt">' + title + '</span>' + sum + who + '</span><span class="chev" aria-hidden="true">' + I.chev + '</span></a>' + docBtns(d) + '</article>';
+}
+function groupByMonth(list){
+  const g = []; let cur = null;
+  list.forEach(d => {
+    const m = monthJa(d.date);
+    if(!cur || cur.m !== m){ cur = {m, items: []}; g.push(cur); }
+    cur.items.push(d);
+  });
+  return g;
+}
+
+function siteTile(s){
+  const href = safeUrl(s.url);
+  let up = "";
+  if(s.self) up = '<b>最終更新</b> ' + esc(DATA.generated_at);
+  else if(s.stopped) up = esc(s.schedule || "停止中");
+  else if(s.schedule) up = '<b>更新の予定</b> ' + esc(s.schedule);
+  const tag = s.stopped ? '<span class="tag stop">停止中</span>' : "";
+  const inner = '<span><span class="nm">' + esc(s.name) + tag + '</span><span class="ds">' + esc(s.desc) + '</span>' + (up ? '<span class="up">' + up + '</span>' : "") + '</span>' + (href ? I.ext : "");
+  return href ? '<a class="tile' + (s.stopped ? " stopped" : "") + '" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + inner + '</a>'
+              : '<div class="tile' + (s.stopped ? " stopped" : "") + '">' + inner + '</div>';
+}
+function pinCard(p){
+  const l = p._docs[0];
+  const line = (p.conclusion && p.conclusion.length)
+    ? '<span class="pl"><b>結論</b><span class="clamp3">' + esc(p.conclusion[0]) + '</span></span>'
+    : (l ? '<span class="pl"><b>最新の資料 ' + esc(dateJa(l.date)) + '</b><span class="clamp3">' + esc(l.title) + '</span></span>' : "");
+  const pdf = p._pdf ? '<div class="acts">' + extLink(safeUrl(p._pdf.pdf), "btn pdf", "最新のPDFを開く", "最新のPDFを開く：" + p._pdf.title) + '</div>' : "";
+  return '<div class="pin"><a class="pin-main" href="#/p/' + enc(p.id) + '"><span class="pn"><span class="nm">' + esc(p.name) + '</span>' + roleTag(p.role) + '</span><span class="ps">' + esc(p.sub) + '</span>' + line + '<span class="pf">' + esc(countLine(p)) + '</span></a>' + pdf + '</div>';
+}
+function newsItem(d){
+  return '<li><a class="news-item" href="#/d/' + enc(d.id) + '"><time datetime="' + esc(d.date) + '">' + esc(dateShort(d.date)) + '</time><span><span class="nt clamp2">' + esc(d.title) + '</span><span class="nc">' + esc(d.category_label) + (d.tier === 3 ? "・🔒 鍵付き" : "") + (safeUrl(d.pdf) ? "・PDFあり" : "") + '</span></span></a></li>';
+}
+function pinBtn(id){
+  const on = getPins().indexOf(id) >= 0;
+  return '<button class="pinbtn" type="button" data-act="pin" data-id="' + esc(id) + '" aria-pressed="' + on + '">' + I.pin + '<span>' + (on ? "ピン済み" : "ピン留め") + '</span></button>';
+}
+
+/* ---------- ツール・シート・自動化の描画（中身は scan_tools.py が README・git・Drive・タスクから毎朝作る） ---------- */
+const AUTO_BY_ID = () => { const m = {}; (DATA.automation || []).forEach(a => { m[a.id] = a; }); return m; };
+function projKv(p){
+  const am = AUTO_BY_ID();
+  const autos = (p.automation || []).map(id => am[id]).filter(Boolean);
+  return [
+    autos.length ? `<div><b>自動実行</b>${autos.map(a => esc(a.when) + "（" + esc(a.how) + "）").join("／")}</div>` : "",
+    p.site ? `<div><b>サイト</b>${esc(p.site)}</div>` : "",
+    p.repo ? `<div><b>GitHub</b>${esc(p.repo)}</div>` : "",
+    (p.skills || []).length ? `<div><b>スキル</b>${esc(p.skills.join("・"))}</div>` : "",
+    p.last_commit ? `<div><b>最終コミット</b>${esc(p.last_commit)}</div>` : "",
+    p.last_file ? `<div><b>ファイルの更新</b>${esc(p.last_file)}</div>` : "",
+    p.files ? `<div><b>ファイル</b>${esc(p.files)}件${p.files_capped ? "以上（数え切れなかった）" : ""}${p.files_note ? "（" + esc(p.files_note) + "）" : ""}</div>` : "",
+    p.tier_reason ? `<div><b>公開版</b>${esc(p.tier_reason)}</div>` : "",
+    p.path ? `<div><b>場所</b><span class="path">${esc(p.path)}</span></div>` : "",
+  ].filter(Boolean).join("");
+}
+function projNote(p){
+  if(p.status === "empty") return `<div class="nbox">フォルダの中身がありません。</div>`;
+  if(/^readme/i.test(p.readme || "")) return "";
+  return `<div class="nbox">README がありません${p.readme ? "（" + esc(p.readme) + " はあります）" : ""}。README.md の最初の見出しと段落が、ここの名前と説明になります。</div>`;
+}
+function projCard(p){
+  const url = safeUrl(p.url) ? extLink(safeUrl(p.url), "btn pri", "サイトを開く ↗") : "";
+  // ローカルのフォルダは URL が無く、場所の文字列だけでは中身に辿り着けなかった。
+  // 書庫に取り込めているものは、カードから直接読めるようにする。
+  const docs = projDocs(p);
+  let jump = "";
+  if(docs.length){
+    const main = p.main_doc ? docs.find(d => _np(d.rel).endsWith(_np(p.main_doc))) : null;
+    const readable = main && main.body ? main : docs.find(d => d.body);
+    if(readable) jump += `<a class="btn pri" href="#/d/${enc(readable.id)}">${main ? "レポートを読む" : "資料を読む"} →</a>`;
+    if(docs.length > 1) jump += `<button class="btn" type="button" data-act="proj" data-id="${esc(p.id)}">資料 ${docs.length} 件をすべて見る</button>`;
+  }
+  // 書庫に本文が無いツールも、GitHub にあればスマホから中身（README・コード）を見られる（要ログイン）
+  if(safeUrl(p.repo_url)) jump += extLink(safeUrl(p.repo_url), "btn", "GitHubで開く ↗", "GitHubで開く：" + p.name);
+  const folder = p.folder && p.folder !== p.name ? `<span class="kind">${esc(p.root_label ? p.root_label + "/" : "")}${esc(p.folder)}</span>` : "";
+  return `<article class="card" data-pid="${esc(p.id)}">
+    <h3>${esc(p.name)} <span class="badge b-${esc(p.status)}">${esc(SLABEL[p.status]||p.status)}</span>
+      ${p.tier === 3 ? '<span class="badge b-lock">🔒 公開版に出さない</span>' : ""}<span class="kind">${esc(p.kind||"")}</span>${folder}</h3>
+    ${p.what ? `<p class="what">${esc(p.what)}</p>` : ""}
+    <div class="kv">${projKv(p)}</div>${projNote(p)}
+    <div class="acts">${url}${jump}</div></article>`;
+}
+function autoCard(a){
+  const p = PROJ_BY_ID[a.project];
+  // 終了コードは起動の結果（多くは wscript で起動して待たないので、0 でも中身が成功したとは限らない）
+  const code = a.last_result === 267009 ? "（実行中）" : a.last_result === 267011 ? "（まだ動いていない）"
+    : (a.last_result != null ? "（終了コード " + esc(a.last_result) + "）" : "");
+  const last = a.last_run ? `<div><b>前回</b>${esc(a.last_run)}${code}</div>` : "";
+  return `<article class="card">
+    <h3>${esc(a.name)} <span class="badge b-${esc(a.status)}">${esc(SLABEL[a.status]||a.status)}</span></h3>
+    ${a.what ? `<p class="what">${esc(a.what)}</p>` : ""}
+    <div class="kv"><div><b>実行</b>${esc(a.when)}</div><div><b>仕組み</b>${esc(a.how)}</div>${last}
+      ${a.next_run ? `<div><b>次回</b>${esc(a.next_run)}</div>` : ""}
+      ${p ? `<div><b>ツール</b><a href="#/tools/tool/${enc(p.id)}">${esc(p.name)}</a></div>` : ""}</div></article>`;
+}
+function sheetCard(s){
+  const u = safeUrl(s.url);
+  const hidden = s.url_hidden ? `<div class="nbox">「リンクを知っている全員」が開ける共有なので、この版にはリンクを載せていません（PC のローカル版か Google ドライブから開けます）。</div>` : "";
+  return `<article class="card" data-pid="${esc(s.id)}">
+    <h3>${esc(s.name)} <span class="badge b-${esc(s.status)}">${esc(SLABEL[s.status]||s.status)}</span>
+      ${s.tier === 3 ? '<span class="badge b-lock">🔒 公開版に出さない</span>' : ""}${s.link_shared ? '<span class="badge b-lock">リンク共有</span>' : ""}<span class="kind">${esc(s.kind || "Google シート")}</span></h3>
+    <div class="kv"><div><b>最終更新</b>${esc(s.modified)}</div><div><b>置き場</b>${esc(s.where)}</div>
+      ${s.tier_reason ? `<div><b>理由</b>${esc(s.tier_reason)}</div>` : ""}</div>${hidden}
+    ${u ? `<div class="acts">${extLink(u, "btn pri", "シートを開く ↗", "シートを開く：" + s.name)}</div>` : ""}</article>`;
+}
+
+/* ============ 画面 ============ */
+
+/* ---------- ホーム「きょうの机」 ---------- */
+function viewHome(){
+  const pins = getPins().map(id => PBYID[id]).filter(Boolean);
+  const pinHtml = pins.map(pinCard).join("") +
+    '<a class="pin add" href="#/people">' + I.plus + '<span>' + (pins.length ? "人物を足す・はずす" : "人物をピン留めする") + '</span></a>';
+  const cut = cutoff(7);
+  const recent = DOCS.filter(d => d.date >= cut);
+  const n = NEW_IDS.size;
+  const toolsN = PROJ.length, sheetN = SHEETS.length, autoN = (DATA.automation || []).length;
+  return '' +
+  '<div class="head"><h1>きょうの机</h1><p class="sub">' + esc(dateLong(String(DATA.generated_at).slice(0, 10))) + 'に更新。資料は全部で' + DOCS.length + '件あります。</p></div>' +
+  (n ? '<div class="newbar"><span>前回の訪問から <b>+' + n + '件</b> 増えました</span><span class="btns"><button class="btn" type="button" data-act="docnew">見る</button><button class="btn" type="button" data-act="seen">既読にする</button></span></div>' : "") +
+  '<section aria-labelledby="hp"><div class="sec-head"><h2 id="hp">ピン留めした人物</h2><a class="more" href="#/people">人物をえらぶ</a></div>' +
+    '<div class="hscroll" tabindex="0" role="region" aria-label="ピン留めした人物。横にスクロールできます">' + pinHtml + '</div></section>' +
+  '<div class="home-cols">' +
+    '<section aria-labelledby="hs"><div class="sec-head"><h2 id="hs">' + SITES.length + 'つのサイト</h2></div>' +
+      '<div class="tiles">' + SITES.map(siteTile).join("") + '</div>' +
+      '<a class="linkrow" href="#/tools"><span>ツール' + toolsN + '件・シート' + sheetN + '件・自動化' + autoN + '件</span><span>ひらく</span></a></section>' +
+    '<section aria-labelledby="hn"><div class="sec-head"><h2 id="hn">今週の新着</h2><button class="more" type="button" data-act="docrecent">資料をすべて見る</button></div>' +
+      (recent.length
+        ? '<ul class="news">' + recent.slice(0, 6).map(newsItem).join("") + '</ul>' +
+          (recent.length > 6 ? '<p class="note">この7日間の新着は全部で' + recent.length + '件。残りは「資料をすべて見る」からどうぞ。</p>' : "")
+        : '<p class="note">この7日間の新着はありません。</p>') +
+    '</section>' +
+  '</div>';
+}
+
+/* ---------- 人物の一覧 ---------- */
+function viewPeople(key){
+  const sel = ROLE_KEYS.indexOf(key) >= 0 ? key : "";
+  const chip = (label, k, n, on) => '<a class="chip" href="#/people' + (k ? "/" + enc(k) : "") + '"' + (on ? ' aria-current="true"' : "") + '>' + esc(label) + ' <span class="n">' + n + '</span></a>';
+  const chips = chip("すべて", "", PEOPLE.length, !sel) + ROLE_KEYS.map(r =>
+    chip(roleLabel(r), r, PEOPLE.filter(p => p.role === r).length, r === sel)).join("");
+  const shown = sel ? [sel] : ROLE_KEYS;
+  const body = shown.map(r => {
+    const list = PEOPLE.filter(p => p.role === r);
+    if(!list.length) return "";
+    return (sel ? "" : '<h2 class="grp">' + esc(roleLabel(r)) + '<span>' + list.length + '人</span></h2>') +
+      '<ul class="plist">' + list.map(p => {
+        const l = p._docs[0];
+        return '<li class="prow"><a class="prow-link" href="#/p/' + enc(p.id) + '"><span class="pr-top"><span class="pr-name">' + esc(p.name) + '</span>' + roleTag(p.role) + '</span><span class="pr-sub">' + esc(p.sub) + '</span><span class="pr-meta">' + esc(countLine(p)) + (l ? "・最新 " + esc(dateJa(l.date)) : "") + '</span></a>' + pinBtn(p.id) + '</li>';
+      }).join("") + '</ul>';
+  }).join("");
+  return '<div class="head"><h1>人物</h1><p class="sub">' + PEOPLE.length + '人。名前だけでなく、あだ名や旧名でも探せます（右上の「さがす」）。</p></div>' +
+    '<div class="chips" role="group" aria-label="役割でしぼる">' + chips + '</div>' + body;
+}
+
+/* ---------- 人物ページ ---------- */
+function viewPerson(id){
+  const p = PBYID[id];
+  if(!p) return '<div class="head"><h1>見つかりません</h1><p class="sub">「' + esc(id) + '」という人物はいません。</p></div><p style="margin-top:16px"><a class="btn" href="#/people">人物の一覧へ</a></p>';
+  const docs = p._docs, latest = docs[0] || null;
+  const pdfN = docs.filter(d => safeUrl(d.pdf)).length;
+  let concl = "";
+  if(p.conclusion && p.conclusion.length){
+    const src = p.conclusion_doc && BYID[p.conclusion_doc]
+      ? '<a class="src" href="#/d/' + enc(p.conclusion_doc) + '">この結論の元になった資料を読む →</a>' : "";
+    concl = '<section class="panel concl cl" aria-labelledby="hc"><h2 id="hc" class="lab">結論</h2>' + p.conclusion.map(c => '<p>' + esc(c) + '</p>').join("") + src + '</section>';
+  }else if(latest){
+    concl = '<section class="panel concl" aria-labelledby="hc"><h2 id="hc" class="lab">最新の資料</h2><p class="lt">' + esc(latest.title) + '</p><p class="ld">' + esc(dateJa(latest.date)) + (latest.tier === 3 ? "・🔒 鍵付き" : "") + '</p>' +
+      '<a class="src" href="#/d/' + enc(latest.id) + '">この資料を読む →</a></section>' +
+      '<p class="note">結論として出せる資料がないため、いちばん新しい資料を載せています（鍵付きの資料の本文はこの版に載せていません）。</p>';
+  }
+  const others = p.aliases.filter(a => a !== p.name);
+  const alias = others.length ? '<p class="alias"><b>ほかの呼び名（さがすときに使えます）</b>' + others.map(esc).join("、") + '</p>' : "";
+  const tl = groupByMonth(docs).map(g =>
+    '<li class="tl-mon"><h3>' + esc(g.m) + '</h3></li>' + g.items.map(d =>
+      '<li class="tl-item"><time class="tl-date" datetime="' + esc(d.date) + '">' + esc(dateShort(d.date)) + '</time>' + docRow(d, {nodate: true}) + '</li>').join("")
+  ).join("");
+  return '' +
+  '<div class="phead"><div><h1>' + esc(p.name) + roleTag(p.role) + '</h1><p class="sub">' + esc(p.sub) + '</p></div>' + pinBtn(p.id) + '</div>' +
+  '<p class="pmeta">資料 ' + esc(countLine(p)) + (pdfN ? "・PDFあり" + pdfN + "件" : "") + (latest ? "・最新 " + esc(dateJa(latest.date)) : "") + '</p>' +
+  (p._pdf ? '<div class="pdfrow">' + extLink(safeUrl(p._pdf.pdf), "btn pdf", "最新のPDFを開く", "最新のPDFを開く：" + p._pdf.title) + '</div>' : "") +
+  '<div class="pgrid"><aside>' + concl + alias + '</aside>' +
+  '<section aria-labelledby="ht"><div class="sec-head"><h2 id="ht">資料の年表</h2></div><p class="note" style="margin-top:0">新しい順に全' + docs.length + '件。🔒は鍵付き、「PDFあり」はPDFがある資料です。PDFとGitHubのボタンは、GitHubにログインしている端末で開けます。</p><ol class="tl">' + tl + '</ol></section></div>';
+}
+
+/* ---------- 資料 ---------- */
+const dst = {q:"", full:false, pdf:false, lock:false, readable:false, recent:false, newOnly:false, cat:"", proj:"", limit:100};
+const BODY = {ready:false, building:false};
+
+/** 本文の全文検索索引。重いので「本文も検索」を選んだ時だけ、画面を固めないよう小分けに作る。 */
+function stripTags(h){
+  return String(h).replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+}
+function startBodyIndex(){
+  if(BODY.ready || BODY.building) return;
+  BODY.building = true;
+  let i = 0;
+  const step = () => {
+    const t0 = performance.now();
+    while(i < DOCS.length && performance.now() - t0 < 14){
+      const d = DOCS[i++];
+      d._b = d.body ? norm(stripTags(d.body)) : "";
+    }
+    if(i < DOCS.length){
+      const n = $("dnote");
+      if(n && dst.full && dst.q) n.textContent = "本文の検索を準備しています… " + i + "/" + DOCS.length;
+      setTimeout(step, 0);
+    }else{
+      BODY.ready = true; BODY.building = false;
+      if(cur.name === "docs") refreshDocs();
+    }
+  };
+  setTimeout(step, 16);   // 先に「準備中」を1度描かせる
+}
+
+function viewDocs(){
+  return '<div class="head"><h1>資料</h1><p class="sub">新しい順。全部で' + DOCS.length + '件。題名を押すと、このサイトの中で読めます。</p></div>' +
+    '<div class="dsearch"><label class="sr" for="dq">資料の題名・要約をさがす</label><input id="dq" type="search" enterkeyhint="search" autocomplete="off" spellcheck="false" placeholder="題名・要約をさがす" value="' + esc(dst.q) + '"><button class="clr" id="dqclr" type="button" data-act="dqclear" aria-label="入力を消す"' + (dst.q ? "" : " hidden") + '>' + I.x + '</button></div>' +
+    '<label class="check"><input type="checkbox" id="dfull"' + (dst.full ? " checked" : "") + '><span>本文も検索する（少し時間がかかります）</span></label>' +
+    '<div id="dfilters"></div><p class="note" id="dnote" aria-live="polite"></p><div id="dres"></div>';
+}
+function refreshDocs(){
+  const box = $("dres"); if(!box) return;
+  const ts = terms(dst.q);
+  const needBody = dst.full && ts.length > 0;
+  if(needBody && !BODY.ready) startBodyIndex();
+  const useBody = needBody && BODY.ready;
+  const cut = dst.recent ? cutoff(7) : null;
+  const pset = dst.proj && PROJ_BY_ID[dst.proj] ? new Set(projDocs(PROJ_BY_ID[dst.proj]).map(d => d.id)) : null;
+  // チップの件数に関わらない絞り込み（期間・新着・プロジェクト・本文あり・ことば）
+  const base = DOCS.filter(d => {
+    if(cut && d.date < cut) return false;
+    if(dst.newOnly && !NEW_IDS.has(d.id)) return false;
+    if(pset && !pset.has(d.id)) return false;
+    if(dst.readable && !d.body) return false;
+    if(ts.length && !ts.every(t => d._h.includes(t) || (useBody && d._b.includes(t)))) return false;
+    return true;
+  });
+  const hasPdf = d => !!safeUrl(d.pdf), isLock = d => d.tier === 3;
+  const okP = d => !dst.pdf || hasPdf(d), okL = d => !dst.lock || isLock(d), okC = d => !dst.cat || d.category === dst.cat;
+  const list = base.filter(d => okP(d) && okL(d) && okC(d));
+  const cPdf = base.filter(d => hasPdf(d) && okL(d) && okC(d)).length;
+  const cLock = base.filter(d => isLock(d) && okP(d) && okC(d)).length;
+  const inCat = base.filter(d => okP(d) && okL(d));
+  const catN = {}; inCat.forEach(d => { catN[d.category] = (catN[d.category] || 0) + 1; });
+  const hasUnread = DOCS.some(d => !d.body);
+  const chip = (act, v, label, n, on) => '<button class="chip" type="button" data-act="' + act + '"' + (v != null ? ' data-v="' + esc(v) + '"' : "") + ' aria-pressed="' + on + '">' + label + (n != null ? ' <span class="n">' + n + '</span>' : "") + '</button>';
+  const proj = dst.proj && PROJ_BY_ID[dst.proj] ? chip("docprojoff", null, "プロジェクト「" + esc(PROJ_BY_ID[dst.proj].name) + "」 ✕", null, true) : "";
+  $("dfilters").innerHTML =
+    '<div class="chips" role="group" aria-label="しぼりこみ">' +
+      chip("docpdf", null, "PDFあり", cPdf, dst.pdf) + chip("doclock", null, "🔒 鍵付き", cLock, dst.lock) +
+      chip("docrecentchip", null, "直近7日", null, dst.recent) +
+      (hasUnread ? chip("docread", null, "本文あり", null, dst.readable) : "") + proj + '</div>' +
+    '<div class="chips scroll" role="group" aria-label="種類でしぼる">' + chip("doccat", "", "すべての種類", inCat.length, !dst.cat) +
+      CATS.map(c => chip("doccat", c, esc(CAT_LABEL[c] || c), catN[c] || 0, dst.cat === c)).join("") + '</div>';
+  const anyFilter = dst.pdf || dst.lock || dst.readable || dst.recent || dst.newOnly || dst.cat || dst.proj || ts.length;
+  const shown = list.slice(0, dst.limit);
+  const monthN = {}; list.forEach(d => { const m = monthJa(d.date); monthN[m] = (monthN[m] || 0) + 1; });
+  const note = $("dnote");
+  if(!(needBody && !BODY.ready)){
+    note.textContent = list.length + "件" + (list.length > shown.length ? "のうち、新しい順に" + shown.length + "件を表示中" : "を表示中") +
+      (dst.newOnly ? "（前回の訪問から増えた資料だけ）" : "");
+  }else{
+    note.textContent = "本文の検索を準備しています… 先に題名・要約での結果を出しています。";
+  }
+  if(!list.length){
+    box.innerHTML = '<div class="none">この条件に当てはまる資料はありません。<br>' +
+      (dst.q && !dst.full ? '<button class="btn pri" type="button" data-act="tryfull">本文も検索して再実行</button>' : "") +
+      (anyFilter ? '<button class="btn" type="button" data-act="docreset">しぼりこみをはずす</button>' : "") + '</div>';
+    return;
+  }
+  const hit = d => useBody && ts.length && !ts.every(t => d._h.includes(t));
+  box.innerHTML = groupByMonth(shown).map(g =>
+    '<section><h2 class="month">' + esc(g.m) + '<span>' + monthN[g.m] + '件</span></h2><div class="doclist">' +
+      g.items.map(d => docRow(d, {who: true, short: true, bodyHit: hit(d), hl: ts.length ? ts : null})).join("") + '</div></section>').join("") +
+    (list.length > shown.length ? '<button class="btn morebtn" type="button" data-act="docmore">もっと見る（あと' + (list.length - shown.length) + '件）</button>' : "") +
+    (anyFilter ? '<button class="btn morebtn" type="button" data-act="docreset">しぼりこみをはずす</button>' : "");
+}
+/** 資料タブを開き直す（絞り込みを初期化して、必要なものだけ指定する）。 */
+function goDocs(patch){
+  Object.assign(dst, {q:"", full:false, pdf:false, lock:false, readable:false, recent:false, newOnly:false, cat:"", proj:"", limit:100}, patch || {});
+  if(location.hash === "#/docs"){ renderBase({name:"docs"}); window.scrollTo(0, 0); }
+  else location.hash = "#/docs";
+}
+
+/* ---------- ツールとサイト ---------- */
+let tstat = "";
+function viewTools(arg){
+  const parts = String(arg || "").split("/");
+  const kind = parts[0], sel = ["site","tool","sheet","auto"].indexOf(kind) >= 0 ? kind : "";
+  const auto = DATA.automation || [];
+  const K = [["site","サイト",SITES.length],["tool","ツール",PROJ.length],["sheet","シート",SHEETS.length],["auto","自動化",auto.length]];
+  const made = DATA.tools_generated_at ? esc(DATA.tools_generated_at) + " に" : "";
+  const warns = (DATA.tools_warnings || []).length
+    ? '<div class="warnbox">一覧を作るときに取れなかったものがあります: ' + DATA.tools_warnings.map(esc).join("／") + '</div>' : "";
+  const chip = (k, label, n) => '<a class="chip" href="#/tools' + (k ? "/" + k : "") + '"' + (sel === k ? ' aria-current="true"' : "") + '>' + label + ' <span class="n">' + n + '</span></a>';
+  let h = "";
+  if(!sel || sel === "site")
+    h += '<section aria-labelledby="k1"><div class="sec-head"><h2 id="k1">サイト</h2></div><div class="tiles two">' + SITES.map(siteTile).join("") + '</div></section>';
+  if(!sel || sel === "tool"){
+    const counts = {}; PROJ.forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1; });
+    const order = PSTATUS_ORDER.concat(Object.keys(counts).filter(s => PSTATUS_ORDER.indexOf(s) < 0));
+    const pc = (s, label, n) => '<button class="chip" type="button" data-act="pstat" data-v="' + esc(s) + '" aria-pressed="' + (tstat === s) + '">' + esc(label) + ' <span class="n">' + n + '</span></button>';
+    const list = tstat ? PROJ.filter(p => p.status === tstat) : PROJ;
+    h += '<section aria-labelledby="k2"><div class="sec-head"><h2 id="k2">ツール</h2></div>' +
+      '<p class="note" style="margin-top:0">' + made + 'フォルダの README・最終コミット・自動実行の設定から作った一覧です（手で登録していません）。「自動で動いている」は自動実行の設定があるという意味で、実行が成功しているかの監視ではありません。</p>' +
+      '<div class="chips scroll" role="group" aria-label="状態でしぼる">' + pc("", "すべて", PROJ.length) +
+        order.filter(s => counts[s]).map(s => pc(s, SLABEL[s] || s, counts[s])).join("") + '</div>' +
+      '<div class="grid2">' + list.map(projCard).join("") + '</div></section>';
+  }
+  if(!sel || sel === "sheet")
+    h += '<section aria-labelledby="k4"><div class="sec-head"><h2 id="k4">Google シート</h2></div>' +
+      '<p class="note" style="margin-top:0">' + made + 'Google ドライブの一覧から作りました（ALTER の業務アカウントと共有ドライブは全部、ほかのアカウントは題名が VTuber・ALTER に関係するものだけ）。新しい順。開くには、そのアカウントでのログインが要ります。</p>' +
+      (SHEETS.length ? '<div class="grid2">' + SHEETS.map(sheetCard).join("") + '</div>' : '<p class="none">シートの一覧がありません。</p>') + '</section>';
+  if(!sel || sel === "auto")
+    h += '<section aria-labelledby="k3"><div class="sec-head"><h2 id="k3">自動化</h2></div>' +
+      '<p class="note" style="margin-top:0">Windows のタスク・Claude の定期タスク（台帳の稼働中の表）・GitHub Actions の予定から作った一覧です。「前回」は Windows のタスクだけ実際の記録で、終了コードは起動の結果です（中身が成功したかは各ツールのログで見ます）。</p>' +
+      '<div class="grid2">' + auto.map(autoCard).join("") + '</div></section>';
+  return '<div class="head"><h1>ツールとサイト</h1><p class="sub">種類ごとに分けています。サイトとシートは新しいタブで開きます。</p></div>' + warns +
+    '<div class="chips" role="group" aria-label="種類でしぼる">' + chip("", "すべて", SITES.length + PROJ.length + SHEETS.length + auto.length) + K.map(k => chip(k[0], k[1], k[2])).join("") + '</div>' + h;
+}
+function afterTools(arg){
+  const parts = String(arg || "").split("/");
+  if((parts[0] !== "tool" && parts[0] !== "sheet") || !parts[1]) return;
+  const el = qs('[data-pid="' + CSS.escape(parts.slice(1).join("/")) + '"]', $("main"));
+  if(!el) return;
+  el.classList.add("flash");
+  el.scrollIntoView({block: "start"});
+  window.scrollBy(0, -68);
+}
+
+/* ============ 検索 ============ */
+function scorePerson(p, t){
+  const n = p._n; let best = 0, why = null;
+  if(n.name === t){ best = 100; why = {k: "name"}; }
+  else{
+    for(let i = 0; i < n.aliases.length; i++){
+      const a = n.aliases[i]; let s = 0;
+      if(a === t) s = 100; else if(a.indexOf(t) === 0) s = 80; else if(a.indexOf(t) >= 0) s = 60;
+      if(s > best){ best = s; why = {k: n.aliases[i] === n.name ? "name" : "alias", v: p.aliases[i]}; }
+    }
+    if(best < 80 && n.name.indexOf(t) === 0){ best = 80; why = {k: "name"}; }
+    else if(best < 60 && n.name.indexOf(t) >= 0){ best = 60; why = {k: "name"}; }
+  }
+  if(best < 40 && n.sub.indexOf(t) >= 0){ best = 40; why = {k: "sub"}; }
+  if(best < 30 && n.role.indexOf(t) >= 0){ best = 30; why = {k: "role"}; }
+  return {s: best, why};
+}
+function nameScore(text, ts){
+  let sc = 0;
+  for(let i = 0; i < ts.length; i++){
+    const at = text.indexOf(ts[i]);
+    if(at < 0) return 0;
+    sc += 50 + (at === 0 ? 10 : 0);
+  }
+  return sc;
+}
+function search(ts){
+  const out = {people: [], docs: [], tools: [], sheets: [], sites: []};
+  PEOPLE.forEach(p => {
+    let min = 1000, why = null;
+    for(let i = 0; i < ts.length; i++){
+      const r = scorePerson(p, ts[i]);
+      if(r.s === 0){ min = 0; break; }
+      if(r.s < min) min = r.s;
+      if(i === 0) why = r.why;
+    }
+    if(min > 0) out.people.push({p, s: min, why});
+  });
+  out.people.sort((a, b) => b.s - a.s || b.p.count - a.p.count);
+  DOCS.forEach(d => { const s = nameScore(d._t, ts); if(s > 0) out.docs.push({d, s}); });
+  out.docs.sort((a, b) => b.s - a.s || newest(a.d, b.d));
+  PROJ.forEach(t => { const s = nameScore(t._t, ts); if(s > 0) out.tools.push({x: t, s}); });
+  SHEETS.forEach(t => { const s = nameScore(t._t, ts); if(s > 0) out.sheets.push({x: t, s}); });
+  SITES.forEach(t => { const s = nameScore(t._t, ts); if(s > 0) out.sites.push({x: t, s}); });
+  out.tools.sort((a, b) => b.s - a.s);
+  out.sheets.sort((a, b) => b.s - a.s || String(b.x.modified).localeCompare(String(a.x.modified)));
+  out.sites.sort((a, b) => b.s - a.s);
+  return out;
+}
+/** 何で当たったか。名前そのものに当たった時は出さない（強調で分かるため）。 */
+function whyHtml(w, ts){
+  if(!w) return "";
+  if(w.k === "alias") return "呼び名「" + hl(w.v, ts) + "」";
+  if(w.k === "sub") return "旧名・ひとことに一致";
+  if(w.k === "role") return "役割に一致";
+  return "";
+}
+
+/* 候補（検索欄の下）の行 */
+function optPerson(x, ts){
+  const p = x.p, w = whyHtml(x.why, ts);
+  return '<a class="opt" data-opt href="#/p/' + enc(p.id) + '"><span class="o-main"><span class="o-title">' + hl(p.name, ts) + (w ? '<span class="o-why">' + w + '</span>' : "") + '</span><span class="o-sub">' + esc(p.sub) + '・' + esc(roleLabel(p.role)) + '</span></span><span class="o-end">' + (+p.count || 0) + '件</span></a>';
+}
+function optDoc(x, ts){
+  const d = x.d;
+  return '<a class="opt" data-opt href="#/d/' + enc(d.id) + '"><span class="o-main"><span class="o-title clamp2">' + hl(d.title, ts) + '</span><span class="o-sub">' + esc(dateJa(d.date)) + '・' + esc(d.category_label) + '</span></span><span class="o-end">' + (d.tier === 3 ? '<span title="鍵付き" aria-label="鍵付き">🔒</span>' : "") + (safeUrl(d.pdf) ? '<span class="tag pdf">PDF</span>' : "") + '</span></a>';
+}
+function optTool(x, ts){
+  const t = x.x;
+  return '<a class="opt" data-opt href="#/tools/tool/' + enc(t.id) + '"><span class="o-main"><span class="o-title">' + hl(t.name, ts) + '</span><span class="o-sub">' + esc(t.kind || "ツール") + '・' + esc(SLABEL[t.status] || t.status) + '</span></span><span class="o-end">›</span></a>';
+}
+function optSheet(x, ts){
+  const t = x.x;
+  return '<a class="opt" data-opt href="#/tools/sheet/' + enc(t.id) + '"><span class="o-main"><span class="o-title">' + hl(t.name, ts) + '</span><span class="o-sub">' + esc(t.kind || "Google シート") + '・' + esc(dateJa(t.modified)) + '</span></span><span class="o-end">' + (t.tier === 3 ? '<span title="公開版に出さない" aria-label="公開版に出さない">🔒</span>' : "›") + '</span></a>';
+}
+function optSite(x, ts){
+  const s = x.x, u = safeUrl(s.url);
+  const inner = '<span class="o-main"><span class="o-title">' + hl(s.name, ts) + '</span><span class="o-sub">' + esc(s.desc) + '</span></span><span class="o-end">' + (u ? '<span aria-hidden="true">↗</span>' : "") + '</span>';
+  return u ? '<a class="opt" data-opt href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + inner + '</a>' : '<div class="opt">' + inner + '</div>';
+}
+function suggestHtml(r, q, ts, total){
+  const G = [["人物", r.people, optPerson], ["資料", r.docs, optDoc], ["ツール", r.tools, optTool], ["シート", r.sheets, optSheet], ["サイト", r.sites, optSite]];
+  let h = '<div class="sug">';
+  G.forEach(g => {
+    if(!g[1].length) return;
+    h += '<div class="g" role="group" aria-label="' + g[0] + '"><div class="g-h" aria-hidden="true"><span>' + g[0] + '</span><span>' + g[1].length + '件</span></div>' + g[1].slice(0, 3).map(x => g[2](x, ts)).join("") + '</div>';
+  });
+  h += '<a class="opt all" data-opt href="#/q/' + enc(q.trim()) + '"><span class="o-main">「' + esc(q.trim()) + '」のすべての結果を見る（' + total + '件）</span></a>';
+  if(window.matchMedia && matchMedia("(pointer:fine)").matches) h += '<div class="hint">↑↓で選ぶ　Enterで開く　Escで閉じる</div>';
+  return h + '</div>';
+}
+
+/* 結果のページ（#/q/<語>） */
+let resLimit = 30;
+function resultsHtml(r, q, ts, total){
+  let h = '<p class="s-sum">「' + esc(q.trim()) + '」の結果: 人物' + r.people.length + '・資料' + r.docs.length + '・ツール' + r.tools.length + '・シート' + r.sheets.length + '・サイト' + r.sites.length + '</p>';
+  if(r.people.length){
+    h += '<h2 class="rg">人物<span>' + r.people.length + '件</span></h2>' + r.people.map((x, i) => {
+      const p = x.p, l = p._docs[0], w = whyHtml(x.why, ts);
+      return '<a class="rp' + (i === 0 ? " top1" : "") + '" href="#/p/' + enc(p.id) + '"><span class="pr-top"><span class="pr-name">' + hl(p.name, ts) + '</span>' + roleTag(p.role) + '</span><span class="pr-sub">' + esc(p.sub) + '</span>' + (w ? '<span class="why">' + w + '</span>' : "") + '<span class="pr-meta">' + esc(countLine(p)) + (l ? "・最新 " + esc(dateJa(l.date)) : "") + '</span></a>';
+    }).join("");
+  }
+  if(r.docs.length){
+    const shown = r.docs.slice(0, resLimit);
+    h += '<h2 class="rg">資料<span>' + r.docs.length + '件</span></h2><div class="doclist">' + shown.map(x => docRow(x.d, {compact: true, who: true, hl: ts})).join("") + '</div>' +
+      (r.docs.length > shown.length ? '<button class="btn morebtn" type="button" data-act="resmore">もっと見る（あと' + (r.docs.length - shown.length) + '件）</button>' : "");
+  }
+  if(r.tools.length) h += '<h2 class="rg">ツール<span>' + r.tools.length + '件</span></h2>' + r.tools.map(x =>
+    '<a class="rp" href="#/tools/tool/' + enc(x.x.id) + '"><span class="pr-top"><span class="pr-name">' + hl(x.x.name, ts) + '</span><span class="badge b-' + esc(x.x.status) + '">' + esc(SLABEL[x.x.status] || x.x.status) + '</span></span><span class="pr-sub">' + esc(x.x.kind || "") + '</span></a>').join("");
+  if(r.sheets.length) h += '<h2 class="rg">シート<span>' + r.sheets.length + '件</span></h2>' + r.sheets.map(x =>
+    '<a class="rp" href="#/tools/sheet/' + enc(x.x.id) + '"><span class="pr-top"><span class="pr-name">' + hl(x.x.name, ts) + '</span><span class="badge b-' + esc(x.x.status) + '">' + esc(SLABEL[x.x.status] || x.x.status) + '</span></span><span class="pr-sub">' + esc(x.x.where || "") + '・最終更新 ' + esc(dateJa(x.x.modified)) + '</span></a>').join("");
+  if(r.sites.length) h += '<h2 class="rg">サイト<span>' + r.sites.length + '件</span></h2><div class="tiles">' + r.sites.map(x => siteTile(x.x)).join("") + '</div>';
+  return h;
+}
+function searchIntro(){
+  const ex = [];
+  const first = PEOPLE[0];
+  if(first){
+    const al = first.aliases.filter(a => a !== first.name).sort((a, b) => a.length - b.length)[0];
+    if(al) ex.push(al);
+    PEOPLE.slice(0, 3).forEach(p => { if(ex.indexOf(p.name) < 0) ex.push(p.name); });
+  }
+  return '<div class="s-intro"><p style="margin-top:14px">人物の名前・あだ名・旧名、資料の題名、ツール名、シートの題名、サイト名で探せます。ひらがなでもカタカナでも、全角でも半角でも同じように探せます。</p>' +
+    (ex.length ? '<h2>たとえば</h2><div class="chips">' + ex.map(w => '<button class="chip" type="button" data-act="suggest" data-v="' + esc(w) + '">' + esc(w) + '</button>').join("") + '</div>' : "") + '</div>';
+}
+let searchMode = "suggest", sActive = -1;
+function renderSearch(){
+  const q = $("sq").value, ts = terms(q), box = $("sres");
+  sActive = -1;
+  if(!ts.length){ box.innerHTML = searchIntro(); return; }
+  const r = search(ts), total = r.people.length + r.docs.length + r.tools.length + r.sheets.length + r.sites.length;
+  if(!total){
+    box.innerHTML = '<p class="s-sum">「' + esc(q.trim()) + '」に当てはまるものはありません。</p><div class="none">別の呼び名や、ひらがなで試してみてください。<br>人物は「人物」タブから一覧で選べます。</div>';
+    return;
+  }
+  box.innerHTML = searchMode === "results" ? resultsHtml(r, q, ts, total) : suggestHtml(r, q, ts, total);
+}
+
+/* ============ 読み手（資料の本文） ============ */
+function showReader(id){
+  const d = BYID[id];
+  const t = $("rtitle"), body = $("rbody");
+  t.classList.remove("open");
+  $("rfull").hidden = true; $("rcopy").hidden = true;
+  $("rfull").onclick = null;
+  if(!d){
+    t.textContent = "資料が見つかりません"; t.title = "";
+    body.innerHTML = '<div class="rinner"><div class="rmiss"><p>この資料は、このサイトにありません。</p><p>消えたか、リンクが古いのかもしれません。</p><div class="acts"><a class="btn" href="#/docs">資料の一覧へ</a></div></div></div>';
+    body.scrollTop = 0;
+    return;
+  }
+  const title = (d.tier === 3 ? "🔒 " : "") + d.title;
+  t.textContent = title; t.title = d.title;
+  // 元ファイルのパスは Windows のもの。PC で貼り付けて使う人のために残す（スマホでは CSS で隠す）。
+  $("rcopy").hidden = !d.path;
+  $("rcopy").onclick = () => {
+    navigator.clipboard?.writeText(d.path).then(
+      () => { $("rcopy").textContent = "コピーしました"; setTimeout(() => $("rcopy").textContent = "パスをコピー", 1600); },
+      () => { $("rcopy").textContent = "コピーできません"; setTimeout(() => $("rcopy").textContent = "パスをコピー", 1600); });
+  };
+  // HTML 成果物（レポート・モック）は枠の中だと読みづらいので、別タブで原寸表示できるようにする。
+  // 元ファイルは端末にしか無くスマホからは開けないため、埋め込み済みの本文から Blob を作って開く。
+  // 注: blob: はこのページのオリジンを継承するので iframe のサンドボックスは効かない。
+  // 中身は自分で書いた HTML だけなので許容する（外部由来の HTML をここに入れないこと）。
+  const isHtml = d.body_kind === "iframe" && !!d.body;
+  $("rfull").hidden = !isHtml;
+  if(isHtml){
+    $("rfull").onclick = () => {
+      const u = URL.createObjectURL(new Blob([d.body], {type: "text/html"}));
+      window.open(u, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+    };
+  }
+  const meta = `<div class="rmeta">
+        <div><b>分類</b> ${esc(d.category_label)} ／ ${esc(d.root_label)}</div>
+        <div><b>日付</b> ${esc(d.date)}（最終更新 ${esc(d.mtime)}）</div>
+        <div><b>元ファイル</b> <span class="path">${esc(d.rel)}</span></div>
+        ${(safeUrl(d.pdf) || safeUrl(d.github)) ? docBtns(d, true) : ""}
+      </div>`;
+  if(!d.body){
+    body.innerHTML = `<div class="rinner">${meta}<div class="rmiss">
+        <p>本文はこのサイトに載せていません。</p>
+        ${d.tier === 3 ? "<p>🔒 鍵付きの資料です。題名と日付だけを載せています。</p>" : ""}
+        ${(safeUrl(d.pdf) || safeUrl(d.github)) ? "<p>元の資料は、GitHub にログインしている端末で開けます。</p>" : "<p>元の資料へのリンクもありません。</p>"}
+      </div></div>`;
+  }else if(isHtml){
+    body.innerHTML = "";
+    const stack = document.createElement("div");
+    stack.className = "rstack";
+    const warn = dataWarning(d);          // データ駆動の成果物は、空に見える理由を先に出す
+    if(warn) stack.appendChild(warn);
+    const f = document.createElement("iframe");
+    f.setAttribute("sandbox", "allow-scripts allow-popups");
+    f.title = d.title;
+    f.srcdoc = d.body;
+    stack.appendChild(f);
+    body.appendChild(stack);
+  }else{
+    body.innerHTML = `<div class="rinner">${meta}<div class="prose">${d.body}</div></div>`;
+    body.querySelectorAll(".prose table").forEach(t2 => {
+      if(t2.parentElement.classList.contains("tablewrap")) return;
+      const w = document.createElement("div"); w.className = "tablewrap";
+      t2.parentNode.insertBefore(w, t2); w.appendChild(t2);
+    });
+    // 本文中の外部リンクは新しいタブで開く（同じタブだと、読んでいた場所に戻れない）
+    body.querySelectorAll(".prose a[href]").forEach(a => {
+      if(/^https?:\/\//i.test(a.getAttribute("href"))){ a.target = "_blank"; a.rel = "noopener noreferrer"; }
+    });
+  }
+  body.scrollTop = 0;
+}
+
+/* ============ 画面の切り替え（ハッシュ） ============ */
+const NAV = [["home","#/","ホーム"],["people","#/people","人物"],["docs","#/docs","資料"],["tools","#/tools","ツールとサイト"]];
+const TITLES = {home:"きょうの机", people:"人物", docs:"資料", tools:"ツールとサイト"};
+let cur = {name:"home"}, baseKey = null, histIdx = 0, replacing = false, overlay = null, lastFocus = null;
+const scrollMemo = {};
+let wired = false;
+
+function parseHash(){
+  const h = location.hash.replace(/^#/, "");
+  if(!h || h === "/") return {name:"home"};
+  const parts = h.split("/");
+  const seg = parts[1] || "";
+  const rest = parts.slice(2).join("/");
+  switch(seg){
+    case "people": return {name:"people", arg: dec(rest.replace(/\/+$/, ""))};
+    case "docs":   return {name:"docs"};
+    case "tools":  return {name:"tools", arg: dec(rest.replace(/\/+$/, ""))};
+    case "p":      return {name:"p", arg: dec(rest.replace(/\/+$/, ""))};
+    case "d":      return {name:"d", arg: dec(rest.replace(/\/+$/, ""))};
+    case "q":      return {name:"q", arg: dec(rest)};
+    default:       return {name:"home"};
+  }
+}
+function buildChrome(){
+  $("tabs").innerHTML = '<div class="brand-d">VTuber資産ポータル<small>ALTER PRODUCTION 社内</small></div>' +
+    NAV.map(n => '<a href="' + n[1] + '" data-tab="' + n[0] + '">' + I[n[0]] + '<span>' + n[2] + '</span></a>').join("");
+  $("icoSearch").innerHTML = I.search;
+  $("sclr").innerHTML = I.x;
+}
+function setChrome(r){
+  const tab = r.name === "p" ? "people" : r.name;
+  qsa("#tabs a").forEach(a => { if(a.dataset.tab === tab) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  $("topLeft").innerHTML = r.name === "p"
+    ? '<button class="back" type="button" data-act="back" data-fb="#/people">' + I.back + '<span>もどる</span></button>'
+    : '<span class="brand-m">VTuber資産ポータル</span>';
+  let t = TITLES[r.name] || "";
+  if(r.name === "p" && PBYID[r.arg]) t = PBYID[r.arg].name;
+  document.title = (t ? t + " / " : "") + "VTuber資産ポータル";
+}
+function renderBase(r){
+  cur = r;
+  baseKey = r.name + "|" + (r.arg || "");
+  const main = $("main");
+  let h;
+  try{
+    if(r.name === "people") h = viewPeople(r.arg);
+    else if(r.name === "docs") h = viewDocs();
+    else if(r.name === "tools") h = viewTools(r.arg);
+    else if(r.name === "p") h = viewPerson(r.arg);
+    else h = viewHome();
+    main.innerHTML = h;
+    if(r.name === "docs") refreshDocs();
+  }catch(e){
+    // 1 つの画面の失敗で全体を落とさない。原因は必ず出す（黙って空にしない）。
+    main.innerHTML = '<div class="none">この画面を表示できませんでした。<br><span class="path">' + esc(e && e.message ? e.message : e) + '</span><br><a class="btn" href="#/">ホームへ</a></div>';
+  }
+  setChrome(r);
+}
+/** 画面を描き直す（ピン留め・絞り込みの切替用）。読んでいた位置とフォーカスを保つ。 */
+function refresh(sel){
+  const y = window.scrollY;
+  renderBase(cur);
+  window.scrollTo(0, y);
+  if(sel){ const el = qs(sel, $("main")); if(el) el.focus({preventScroll: true}); }
+}
+
+function setOverlay(name){
+  const was = overlay;
+  if(!was && name) lastFocus = document.activeElement;
+  overlay = name;
+  $("search").hidden = name !== "search";
+  $("reader").hidden = name !== "reader";
+  const app = $("app");
+  if(name){ app.setAttribute("inert", ""); app.setAttribute("aria-hidden", "true"); }
+  else{ app.removeAttribute("inert"); app.removeAttribute("aria-hidden"); }
+  document.documentElement.classList.toggle("lock", !!name);
+  if(was && !name && lastFocus && document.contains(lastFocus) && typeof lastFocus.focus === "function"){
+    try{ lastFocus.focus({preventScroll: true}); }catch(e){}
+  }
+  return was !== name;
+}
+function route(traversal){
+  const r = parseHash();
+  if(r.name === "q" || r.name === "d"){
+    if(baseKey === null){ renderBase({name:"home"}); }   // 直接リンクで来たとき、後ろに何も無いと困る
+    if(r.name === "q"){
+      const fresh = setOverlay("search");
+      document.title = (r.arg ? "「" + r.arg + "」の結果" : "さがす") + " / VTuber資産ポータル";
+      const sIn = $("sq");
+      if(r.arg){ searchMode = "results"; if(sIn.value !== r.arg) sIn.value = r.arg; }
+      else searchMode = "suggest";
+      $("sclr").hidden = !sIn.value;
+      if(fresh) resLimit = 30;
+      renderSearch();
+      if(fresh && searchMode === "suggest") sIn.focus({preventScroll: true});
+    }else{
+      setOverlay("reader");
+      const dd = BYID[r.arg];
+      document.title = (dd ? dd.title : "資料が見つかりません") + " / VTuber資産ポータル";
+      showReader(r.arg);
+      $("rback").focus({preventScroll: true});
+    }
+    return;
+  }
+  if(overlay) setOverlay(null);
+  const key = r.name + "|" + (r.arg || "");
+  if(key === baseKey){ setChrome(cur); return; }
+  renderBase(r);
+  const y = traversal && scrollMemo[histIdx] != null ? scrollMemo[histIdx] : 0;
+  window.scrollTo(0, y);
+  if(r.name === "tools" && !traversal) afterTools(r.arg);   // 検索から来たツールのカードまで送る
+  if(!traversal) $("main").focus({preventScroll: true});
+}
+function onHash(){
+  // 戻る/進む（履歴の項目に番号が残っている）と、リンクを押した新しい項目（残っていない）を見分ける。
+  const prev = histIdx;
+  if(!overlay) scrollMemo[prev] = window.scrollY;      // 画面を離れる時の位置（戻ったときに復元）
+  let traversal = false;
+  if(replacing){ replacing = false; try{ history.replaceState({vp: histIdx}, ""); }catch(e){} }
+  else if(history.state && typeof history.state.vp === "number"){ histIdx = history.state.vp; traversal = true; }
+  else{ histIdx = prev + 1; try{ history.replaceState({vp: histIdx}, ""); }catch(e){} }
+  try{ route(traversal); }
+  catch(e){ $("main").innerHTML = '<div class="none">この画面を表示できませんでした。<br><span class="path">' + esc(e && e.message ? e.message : e) + '</span></div>'; }
+}
+/** 「戻る」。この画面の前が無い（直接リンクで開いた）ときは、履歴を溜めずに既定の画面へ置き換える。 */
+function goBack(fb){
+  if(histIdx > 0) history.back();
+  else{ replacing = true; setTimeout(() => { replacing = false; }, 400); location.replace(fb || "#/"); }
+}
+
+/* ============ 操作 ============ */
+function isTyping(el){ return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable); }
+function onClick(e){
+  const el = e.target.closest("[data-act]");
+  if(!el) return;
+  const act = el.dataset.act;
+  switch(act){
+    case "opensearch":
+      $("sq").value = ""; $("sclr").hidden = true; searchMode = "suggest"; resLimit = 30;
+      renderSearch(); setOverlay("search"); $("sq").focus();     // iOS はタップの中で focus しないとキーボードが出ない
+      if(location.hash !== "#/q/") location.hash = "#/q/";
+      break;
+    case "back": goBack(el.dataset.fb || "#/"); break;
+    case "sclear":
+      $("sq").value = ""; $("sclr").hidden = true; searchMode = "suggest";
+      if(location.hash !== "#/q/") history.replaceState(history.state, "", "#/q/");
+      renderSearch(); $("sq").focus();
+      break;
+    case "suggest":
+      $("sq").value = el.dataset.v; $("sclr").hidden = false;
+      searchMode = "suggest"; renderSearch(); $("sq").focus();
+      break;
+    case "resmore": resLimit += 30; renderSearch(); break;
+    case "pin": togglePin(el.dataset.id); refresh('[data-act="pin"][data-id="' + el.dataset.id.replace(/["\\]/g, "\\$&") + '"]'); break;
+    case "seen": markAllSeen(); break;
+    case "docnew": goDocs({newOnly: true}); break;
+    case "docrecent": goDocs({recent: true}); break;
+    case "proj": goDocs({proj: el.dataset.id}); break;
+    case "pstat": tstat = el.dataset.v; refresh('[data-act="pstat"][data-v="' + CSS.escape(el.dataset.v) + '"]'); break;
+    case "docpdf": dst.pdf = !dst.pdf; dst.limit = 100; refreshDocs(); break;
+    case "doclock": dst.lock = !dst.lock; dst.limit = 100; refreshDocs(); break;
+    case "docread": dst.readable = !dst.readable; dst.limit = 100; refreshDocs(); break;
+    case "docrecentchip": dst.recent = !dst.recent; dst.limit = 100; refreshDocs(); break;
+    case "doccat": dst.cat = el.dataset.v || ""; dst.limit = 100; refreshDocs(); break;
+    case "docprojoff": dst.proj = ""; dst.limit = 100; refreshDocs(); break;
+    case "docmore": dst.limit += 100; refreshDocs(); break;
+    case "docreset":
+      Object.assign(dst, {q:"", pdf:false, lock:false, readable:false, recent:false, newOnly:false, cat:"", proj:"", limit:100});
+      if($("dq")){ $("dq").value = ""; $("dqclr").hidden = true; }
+      refreshDocs();
+      break;
+    case "tryfull":
+      dst.full = true; if($("dfull")) $("dfull").checked = true; refreshDocs();
+      break;
+    case "dqclear":
+      dst.q = ""; dst.limit = 100; $("dq").value = ""; $("dqclr").hidden = true; refreshDocs(); $("dq").focus();
+      break;
+  }
+}
+let dqTimer = null;
+function onInput(e){
+  const t = e.target;
+  if(t.id === "dq"){
+    dst.q = t.value.trim(); dst.limit = 100;
+    $("dqclr").hidden = !t.value;
+    clearTimeout(dqTimer);
+    dqTimer = setTimeout(refreshDocs, 120);        // 打鍵ごとに数百枚を組み直さない
+  }else if(t.id === "sq"){
+    $("sclr").hidden = !t.value;
+    if(searchMode === "results"){
+      // 打ち直したら「結果のページ」ではなく候補に戻す（アドレスの語と画面がずれないように）
+      searchMode = "suggest";
+      if(location.hash !== "#/q/") history.replaceState(history.state, "", "#/q/");
+    }
+    resLimit = 30;
+    renderSearch();
+  }
+}
+function onChange(e){
+  if(e.target.id === "dfull"){ dst.full = e.target.checked; dst.limit = 100; refreshDocs(); }
+}
+function onSearchKey(e){
+  if(e.isComposing || e.keyCode === 229) return;       // 日本語入力の変換確定の Enter を取らない
+  const opts = qsa("[data-opt]", $("sres"));
+  if(e.key === "ArrowDown" || e.key === "ArrowUp"){
+    if(!opts.length) return;
+    e.preventDefault();
+    sActive = e.key === "ArrowDown" ? Math.min(opts.length - 1, sActive + 1) : Math.max(-1, sActive - 1);
+    opts.forEach((o, i) => o.classList.toggle("act", i === sActive));
+    if(sActive >= 0) opts[sActive].scrollIntoView({block: "nearest"});
+  }else if(e.key === "Enter"){
+    e.preventDefault();
+    if(sActive >= 0 && opts[sActive]){ opts[sActive].click(); return; }
+    const q = $("sq").value.trim();
+    if(q){ $("sq").blur(); location.hash = "#/q/" + enc(q); }
+  }
+}
+function onKey(e){
+  if(e.key === "Escape" && overlay){ goBack(overlay === "reader" ? "#/docs" : "#/"); return; }
+  if(e.key === "/" && !overlay && !isTyping(e.target) && !e.ctrlKey && !e.metaKey && !e.altKey){
+    e.preventDefault(); $("openSearch").click();
+  }
+}
+
+function wireOnce(){
+  if(wired) return;
+  wired = true;
+  document.addEventListener("click", onClick);
+  document.addEventListener("input", onInput);
+  document.addEventListener("change", onChange);
+  document.addEventListener("keydown", onKey);
+  $("sq").addEventListener("keydown", onSearchKey);
+  window.addEventListener("hashchange", onHash);
+  $("rtitle").onclick = () => $("rtitle").classList.toggle("open");
+  // 本文の中の「#見出し」リンクは、サイトの画面切り替えと取り違えない（押すと読み手が閉じてホームに戻ってしまう）
+  $("rbody").addEventListener("click", e => {
+    const a = e.target.closest(".prose a[href]"); if(!a) return;
+    const h = a.getAttribute("href");
+    if(h && h.charAt(0) === "#"){
+      e.preventDefault();
+      const id = dec(h.slice(1)).replace(/["\\]/g, "\\$&");
+      const t = id ? qs('[id="' + id + '"]', $("rbody")) : null;
+      if(t) t.scrollIntoView();
+    }
+  });
+  if("scrollRestoration" in history) history.scrollRestoration = "manual";
+}
+
+function render(){
+  prepare();
+  $("loading").hidden = true;
+  $("app").hidden = false;
+  buildChrome();
+  computeNew();
+  wireOnce();
+  if(history.state && typeof history.state.vp === "number") histIdx = history.state.vp;
+  else{ histIdx = 0; try{ history.replaceState({vp: 0}, ""); }catch(e){} }
+  route(false);
+}
+
+boot().catch(fatal);
+</script>
+</body>
+</html>
